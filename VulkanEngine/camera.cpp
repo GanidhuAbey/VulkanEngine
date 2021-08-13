@@ -2,45 +2,6 @@
 
 using namespace camera;
 
-Camera::Camera(ProjectionType projection, glm::vec3 newEye, glm::vec3 cameraDirection, glm::vec3 camera_up, create::Engine* eng) {
-    engine = eng;
-
-    eye = newEye;
-    target = cameraDirection;
-    up = camera_up;
-
-    worldToCamera = createCameraMatrix(eye, eye + target, up);    
-    //can be restructured w/o if statement
-    if (projection == ProjectionType::PERSPECTIVE_PROJECTION) {
-        perspective = createPerspectiveMatrix(glm::radians(45.0f), engine->screenWidth/(float)engine->screenHeight, 0.1f, 150.0f);
-    }
-    else {
-        perspective = createOrthogonalMatrix(engine->screenWidth, engine->screenHeight, 0.1f, 10.0f);
-    }
-
-    engine->sendCameraData(worldToCamera, perspective);
-}
-
-Camera::~Camera() {}
-
-void Camera::update(std::optional<glm::vec3> position, std::optional<glm::vec3> direction, std::optional<glm::vec3> camera_up) {
-    glm::vec3 newEye = (position.has_value()) ? position.value() : eye;
-    glm::vec3 newDirection = (direction.has_value()) ? (newEye + direction.value()) : target;
-    glm::vec3 newUp = (camera_up.has_value()) ? camera_up.value() : up;
-
-
-    worldToCamera = createCameraMatrix(newEye, newDirection, newUp);
-    engine->sendCameraData(worldToCamera, perspective);
-    
-}
-
-glm::mat4 Camera::getCameraMatrix() {
-    return worldToCamera;
-}
-
-glm::mat4 Camera::getProjectionMatrix() {
-    return perspective;
-}
 
 
 /// - PURPOSE - 
@@ -52,7 +13,7 @@ glm::mat4 Camera::getProjectionMatrix() {
 /// [glm::mat4] worldToCamera - matrix representing the transformation required to get to camera space
 /// - NOTES - 
 /// for some reason matrix multiplication was not giving me the expected output
-glm::mat4 Camera::createCameraMatrix(glm::vec3 cameraPos, glm::vec3 lookAt, glm::vec3 up) {
+glm::mat4 camera::createCameraMatrix(glm::vec3 cameraPos, glm::vec3 lookAt, glm::vec3 up) {
     //we know we're looking at the point described by the lookAt matrix, but where is the camera?
     //this vector should also represent the distance we need to translate the object by;
     glm::vec3 camera_z = glm::normalize(lookAt - cameraPos);
@@ -73,7 +34,7 @@ glm::mat4 Camera::createCameraMatrix(glm::vec3 cameraPos, glm::vec3 lookAt, glm:
     return glm::transpose(modelToWorld);
 }
 
-glm::mat4 Camera::createOrthogonalMatrix(int width, int height, float n, float f) {
+glm::mat4 camera::createOrthogonalMatrix(int width, int height, float n, float f) {
     float r = (float) width/2;
     float t = (float) height/2;
     //the given parameters define a cube the governs the space that our input values live in. we must then convert this cube
@@ -107,7 +68,7 @@ glm::mat4 Camera::createOrthogonalMatrix(int width, int height, float n, float f
     return glm::transpose(project * normalize * translate);
 }
 
-glm::mat4 Camera::createPerspectiveMatrix(float angle, float aspect, float n, float f) {
+glm::mat4 camera::createPerspectiveMatrix(float angle, float aspect, float n, float f) {
     //find the distance to the "screen" that will be mapped to
     //the distance to the screen is related to the angle between 'l' and 'r' by the eqn : phi = 2arctan(w/2d)
     //d = w/(2*tan(phi/2)) <-- how can i derive the the neccesarry information to solve this from the parameters used by glm::perspective?

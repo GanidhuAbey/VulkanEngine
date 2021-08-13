@@ -8,7 +8,7 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-using namespace create;
+using namespace core;
 
 EngWindow::~EngWindow() {
     std::cout << "window destruction..." << std::endl;

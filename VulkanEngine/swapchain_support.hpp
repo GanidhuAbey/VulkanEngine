@@ -5,7 +5,7 @@
 
 #include <vector>
 
-namespace create {
+namespace core {
 class SwapChainSupport {
     public:
         VkSurfaceCapabilitiesKHR capabilities;

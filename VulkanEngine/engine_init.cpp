@@ -5,9 +5,6 @@
 #define GLFW_INCLUDE_VULKAN
 #include <GLFW/glfw3.h>
 
-
-#include <fstream>
-
 //this is the standard validation layer that is included in the vulkan sdk
 //if more validation layers are needed then its best to add them here
 //(i think)
@@ -17,7 +14,7 @@ const std::vector<const char *> validationLayers = {
 const std::vector<const char *> deviceExtensions = {
     VK_KHR_SWAPCHAIN_EXTENSION_NAME};
 
-using namespace create;
+using namespace core;
 
 bool EngineInit::checkValidationLayerSupport()
 {
@@ -80,25 +77,6 @@ bool EngineInit::checkDeviceExtensionSupport(VkPhysicalDevice device)
     return true;
 }
 
-std::vector<char> EngineInit::readFile(const std::string& filename) {
-    std::ifstream file(filename, std::ios::ate | std::ios::binary);
-
-    if (!file.is_open()) {
-        throw std::runtime_error("could not open file");
-    }
-
-    size_t fileSize = (size_t) file.tellg();
-
-    std::vector<char> buffer(fileSize);
-
-    file.seekg(0);
-    file.read(buffer.data(), fileSize);
-    file.close();
-
-    return buffer;
-}
-
-
 //TODO: update to vulkan version 1.2
 int EngineInit::rateDeviceSuitability(VkPhysicalDevice device)
 {
@@ -122,7 +100,6 @@ int EngineInit::rateDeviceSuitability(VkPhysicalDevice device)
 
     //vkGetPhysicalDeviceFeatures2(device, &deviceFeatures);
 
-    //std::cout << "device name:  "  << deviceProperties.deviceName << std::endl;
 
     if (deviceProperties.deviceType == VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU) {
         score += 1000;
@@ -153,7 +130,7 @@ int EngineInit::rateDeviceSuitability(VkPhysicalDevice device)
     //check if the binding count is atleast 1
     //TODO: this is a kind of check you do when you know what you'll be drawing,
     //but we should figure out some general parameters to make sure the device we pull can draw at most things
-    if (deviceProperties.limits.maxVertexInputBindings < 1 || deviceProperties.limits.maxVertexInputBindingStride < sizeof(data::Vertex2D))
+    if (deviceProperties.limits.maxVertexInputBindings < 1 || deviceProperties.limits.maxVertexInputBindingStride < sizeof(data::Vertex))
     {
         return 0;
     }
@@ -201,14 +178,6 @@ std::vector<const char *> EngineInit::getRequiredExtensions()
 //challenge function to compare extensions returned by glfw versus the supported extensions
 bool EngineInit::checkSupportedExtensions(std::vector<const char *> requiredExtensions)
 {
-    //debugging: print out all supported extensions
-    /*
-    std::cout << "supported extensions:" << std::endl;
-    for (const auto& extension : supportedExtensions) {
-        std::cout << '\t' << extension.extensionName << std::endl;
-    }
-    */
-
     //grab the number of supported extensions
     uint32_t extensionCount = 0;
     //do layers have extensions associated with it?
@@ -254,7 +223,6 @@ void EngineInit::initialize(GLFWwindow *userWindow)
 {
     window = userWindow;
 
-    std::cout << "HELLO" << std::endl;
     createInstance();
     createSurface();
     setupDebugMessenger();
@@ -397,7 +365,6 @@ void EngineInit::pickPhysicalDevice()
 
     for (const auto &device : devices)
     {
-        //std::cout << "devices: " << device << std::endl;
         int score = rateDeviceSuitability(device);
         candidates.insert(std::make_pair(score, device));
     }
@@ -405,7 +372,6 @@ void EngineInit::pickPhysicalDevice()
     if (candidates.rbegin()->first > 0)
     {
         //this device is suitable
-        //std::cout << physicalDevice << std::endl;
         physicalDevice = candidates.rbegin()->second;
         VkPhysicalDeviceProperties deviceProperties{};
 

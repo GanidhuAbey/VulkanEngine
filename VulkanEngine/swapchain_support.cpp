@@ -1,6 +1,8 @@
 #include "swapchain_support.hpp"
 
-namespace create {
+#include <stdexcept>
+
+namespace core {
     SwapChainSupport::SwapChainSupport(VkPhysicalDevice device, VkSurfaceKHR surface) {
         querySwapChainSupport(device, surface);
     }

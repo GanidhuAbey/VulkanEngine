@@ -7,7 +7,7 @@
 #include "error_setup.hpp"
 #include "common.hpp"
 
-namespace create {
+namespace core {
 
 class EngWindow {
     //construct/deconstruct functions

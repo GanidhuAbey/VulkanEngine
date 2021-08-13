@@ -1,6 +1,6 @@
+//IF THE PROGRAM DOESNT WORK FOR SOME REASON CHECK IF THE VECTOR INSIDE ENGINE IS CONSISTENT WITH THE INDIVIDUAL OBJECTS
+
 #include "engine.hpp"
-#include "game_objects.hpp"
-#include "camera.hpp"
 
 #include <chrono>
 #include <iostream>
@@ -11,16 +11,12 @@
 const int WIDTH = 800;
 const int HEIGHT = 600;
 
-const double CAMERA_SPEED = 0.05f;
-const double MOUSE_SENSITIVITY = 1.0f;
+const float CAMERA_SPEED = 0.05f;
+const float MOUSE_SENSITIVITY = 1.0f;
 
 int main() {
-    //initialize editor
-
     //initialize engine
-    create::Engine engine(WIDTH, HEIGHT, "Test");
-
-    //initialize camera
+    create::Engine engine(WIDTH, HEIGHT, "Test123456");
 
     //create a camera for the scene
     glm::vec3 camera_pos = glm::vec3(0.0, 0.0, 3.0); //where camera is located
@@ -30,18 +26,21 @@ int main() {
 
     float camera_speed = 0.05f;
     float sensitivity = 0.05f;
+    
+    create::UserCamera* camera = engine.createCamera(camera_pos, camera_front, up, glm::radians(45.0f));
 
-    camera::Camera camera(camera::ProjectionType::PERSPECTIVE_PROJECTION, camera_pos, camera_front, up, &engine);
+    //create an object
+    create::UserObject* someObject = engine.createObject();
+    //add some mesh data to this object
+    someObject->addMesh("objects/test_object/test.obj", create::Color(1.0, 0., 0.0));
 
-    //create a empty object and plug in the mesh data
-    gameObject::EmptyObject test(&engine);
-    //auto t1 = std::chrono::high_resolution_clock::now();
-    test.addMeshData("objects/test_object/test.obj");
-    auto t2 = std::chrono::high_resolution_clock::now();
-    //std::chrono::duration<double, std::milli> time_took = t2 - t1;
-    //std::cout << "the time the function took: " << time_took.count() << std::endl;
-
-    double xTranslate = 0.0;
+    //create light object
+    create::UserObject* light = engine.createObject();
+    light->addMesh("objects/test_object/test.obj", create::Color(1.0, 1.0, 1.0));
+    light->translate(glm::vec3(5.0, 0.0, 0.0));
+    light->scale(0.1, 0.1, 0.1);
+    
+   
     int frameCount = 0;
     //in radians
     float angle = 0.0f;
@@ -50,16 +49,18 @@ int main() {
     double pitch = 0.0;
 
     //capture the cursor
-    engine.userWindow.captureCursor();
+    engine.captureCursor();
 
     //setup callback function
     double lastX = WIDTH/2, lastY = HEIGHT/2;
     double xPos = WIDTH/2, yPos = HEIGHT/2;
-    while (!engine.userWindow.closeRequest()) {
+
+    bool close_now = false;
+    while (!engine.checkCloseRequest() && !close_now) {
 
         auto t1 = std::chrono::high_resolution_clock::now();
 
-        test.addTransform(0, 0, 0, angle);
+        //test.addTransform(0, 0, 0, angle);
 
         double offsetX = (xPos - lastX) * sensitivity;
         double offsetY = (yPos - lastY) * sensitivity;
@@ -71,7 +72,7 @@ int main() {
         lastY = yPos;
 
         //get cursor position
-        engine.userWindow.getCursorPosition(&xPos, &yPos);
+        engine.getCursorPosition(&xPos, &yPos);
 
         camera_front.x = (float) (glm::sin(glm::radians(yaw)) * glm::cos(glm::radians(pitch)));
         camera_front.y = (float) glm::sin(glm::radians(pitch));
@@ -80,36 +81,37 @@ int main() {
         
         //check key inputs
         
-        if (engine.userWindow.isKeyPressed(WindowInput::W)) {
+        if (engine.isKeyPressed(WindowInput::W)) {
             camera_pos += camera_speed * camera_front;
         }
-        else if (engine.userWindow.isKeyPressed(WindowInput::A)) {
+        else if (engine.isKeyPressed(WindowInput::A)) {
             camera_pos -= glm::normalize(glm::cross(camera_front, up)) * camera_speed;
         }
-        else if (engine.userWindow.isKeyPressed(WindowInput::S)) {
+        else if (engine.isKeyPressed(WindowInput::S)) {
             camera_pos -= camera_speed * camera_front;
         }
-        else if (engine.userWindow.isKeyPressed(WindowInput::D)) {
+        else if (engine.isKeyPressed(WindowInput::D)) {
             camera_pos += glm::normalize(glm::cross(camera_front, up)) * camera_speed;
         }
         
         frameCount++;
         angle += 0.01f;
 
-        camera.update(camera_pos, camera_front);
-        engine.draw();
+        //this is probably not the optimal way to do this
+        camera->update(camera_pos, camera_front);
+        engine.render();
 
         auto t2 = std::chrono::high_resolution_clock::now();
         std::chrono::duration<double, std::milli> ms_double = t2 - t1;
         camera_speed = CAMERA_SPEED * (float)(ms_double.count() / 10);
-        sensitivity = MOUSE_SENSITIVITY * (float)(ms_double.count() / 10);
+        //TODO: figure out cause of the inconsistent frames.
+        sensitivity = MOUSE_SENSITIVITY * 0.1; //(float)(ms_double.count() / 10);
 
-        if (engine.userWindow.isKeyPressed(WindowInput::X)) {
-
+        if (engine.isKeyPressed(WindowInput::X)) {
             printf("frametime: %f \n", ms_double.count());
+            //close_now = true;
         }
     }
-
     return 1;
 }
 

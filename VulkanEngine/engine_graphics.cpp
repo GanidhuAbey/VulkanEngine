@@ -9,7 +9,7 @@ void EngineGraphics::recreateSwapChain() {
     //probably shouldn't recreate any of these till the device has caught up to the most recent call
     vkDeviceWaitIdle(engineInit->device);
 
-    create::SwapChainSupport details(engineInit->physicalDevice, engineInit->surface);
+    core::SwapChainSupport details(engineInit->physicalDevice, engineInit->surface);
     VkSurfaceFormatKHR surfaceFormat = chooseSwapChainFormat(details.formats);
     createSwapChain(); //
     //createSwapChain(VK_FORMAT_D16_UNORM, VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT, &depthChain, &depthImages);
@@ -29,7 +29,7 @@ void EngineGraphics::recreateSwapChain() {
     createRenderPass(); //
     //createGraphicsPipeline(); //
     createFrameBuffers(); //
-    createCommandBuffers(vertexBuffer, indexBuffer); //
+    createCommandBuffers(vertexBuffer, indexBuffer, recentIndices, recentVertices); //
 }
 
 void EngineGraphics::cleanupSwapChain(bool destroyAll) {
@@ -135,7 +135,7 @@ VkExtent2D EngineGraphics::chooseSwapExtent(const VkSurfaceCapabilitiesKHR& capa
     }
 }
 
-void EngineGraphics::initialize(create::EngineInit* initEngine) {
+void EngineGraphics::initialize(core::EngineInit* initEngine) {
     engineInit = initEngine;
 
     createSwapChain(); //
@@ -156,6 +156,9 @@ EngineGraphics::~EngineGraphics() {
 
     for (size_t i = 0; i < descriptorPools.size(); i++) {
         vkDestroyDescriptorPool(engineInit->device, descriptorPools[i], nullptr);
+    }
+    for (size_t i = 0; i < uniformBufferData.size(); i++) {
+        mem::maDestroyMemory(engineInit->device, uniformBufferData[i]);
     }
     vkDestroyDescriptorSetLayout(engineInit->device, setLayout,  nullptr);
 
@@ -195,7 +198,7 @@ EngineGraphics::~EngineGraphics() {
 }
 
 void EngineGraphics::createSwapChain() {
-    create::SwapChainSupport details(engineInit->physicalDevice, engineInit->surface);
+    core::SwapChainSupport details(engineInit->physicalDevice, engineInit->surface);
 
     VkSurfaceCapabilitiesKHR surfaceCapabilities{};
     if (vkGetPhysicalDeviceSurfaceCapabilitiesKHR(engineInit->physicalDevice, engineInit->surface, &surfaceCapabilities) != VK_SUCCESS) {
@@ -230,7 +233,7 @@ void EngineGraphics::createSwapChain() {
     //TODO: try with false later
     createInfo.clipped = VK_TRUE;
 
-    create::QueueData indices(engineInit->physicalDevice, engineInit->surface);
+    core::QueueData indices(engineInit->physicalDevice, engineInit->surface);
 
     uint32_t queueIndices[] = {indices.graphicsFamily.value(), indices.presentFamily.value()};
 
@@ -282,7 +285,7 @@ void EngineGraphics::createDepthImage() {
 
 void EngineGraphics::createImage(VkFormat format, VkImageUsageFlags usage,  VkImage* image) {
 
-    create::QueueData indices(engineInit->physicalDevice, engineInit->surface);
+    core::QueueData indices(engineInit->physicalDevice, engineInit->surface);
 
     VkImageCreateInfo imageInfo{};
     imageInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
@@ -510,6 +513,9 @@ void EngineGraphics::createDescriptorSetLayout() {
     if (vkCreateDescriptorSetLayout(engineInit->device, &layoutInfo, nullptr, &setLayout) != VK_SUCCESS) {
         throw std::runtime_error("could not create descriptor set");
     }
+
+    //update descriptor set size here
+    descriptorSets.resize(swapChainImages.size());
 }
 
 /// - PURPOSE -
@@ -565,23 +571,28 @@ void EngineGraphics::createDescriptorSets(VkDeviceSize bufferSize, VkBuffer buff
     allocateInfo.descriptorSetCount = static_cast<uint32_t>(swapChainImages.size());
     allocateInfo.pSetLayouts = layouts.data();
 
-    size_t currentSize = descriptorSets.size();
-    descriptorSets.resize(currentSize + 1);
-    descriptorSets[currentSize].resize(swapChainImages.size());
-    if (vkAllocateDescriptorSets(engineInit->device, &allocateInfo, descriptorSets[currentSize].data()) != VK_SUCCESS) {
+    //size_t currentSize = descriptorSets.size();
+    //descriptorSets.resize(currentSize + 1);
+    //descriptorSets[currentSize].resize(swapChainImages.size());
+
+    std::vector<VkDescriptorSet> currentDescriptorSet(swapChainImages.size());
+    if (vkAllocateDescriptorSets(engineInit->device, &allocateInfo, currentDescriptorSet.data()) != VK_SUCCESS) {
         throw std::runtime_error("failed to allocate descriptor sets!");
     }
 
+    size_t currentSize = descriptorSets[0].size();
     for (size_t i = 0; i < swapChainImages.size(); i++) {
-        updateDescriptorSet(descriptorSets[currentSize][i], bufferSize, buffer);
+        descriptorSets[i].resize(currentSize + 1);
+        descriptorSets[i][currentSize] = currentDescriptorSet[i];
+        updateDescriptorSet(currentDescriptorSet[i], bufferSize, buffer);
     }
 
 }
 
 void EngineGraphics::createGraphicsPipeline()  {
     //load in the appropriate shader code for a triangle
-    auto vertShaderCode = engineInit->readFile("shaders/vert.spv");
-    auto fragShaderCode = engineInit->readFile("shaders/frag.spv");
+    auto vertShaderCode = readFile("shaders/vert.spv");
+    auto fragShaderCode = readFile("shaders/frag.spv");
 
     //convert the shader code into a vulkan object
     VkShaderModule vertShader = createShaderModule(vertShaderCode);
@@ -599,7 +610,7 @@ void EngineGraphics::createGraphicsPipeline()  {
 
     VkVertexInputBindingDescription bindingDescrip{};
     bindingDescrip.binding = 0;
-    bindingDescrip.stride = sizeof(data::Vertex2D);
+    bindingDescrip.stride = sizeof(data::Vertex);
     bindingDescrip.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
     vertexInputInfo.pVertexBindingDescriptions = &bindingDescrip;
 
@@ -615,7 +626,7 @@ void EngineGraphics::createGraphicsPipeline()  {
     colorAttribute.location = 1;
     colorAttribute.binding = 0;
     colorAttribute.format = VK_FORMAT_R32G32B32_SFLOAT;
-    colorAttribute.offset = offsetof(data::Vertex2D, color);
+    colorAttribute.offset = offsetof(data::Vertex, color);
 
     VkVertexInputAttributeDescription attributeDescriptions[] = {posAttribute, colorAttribute};
 
@@ -653,7 +664,7 @@ void EngineGraphics::createGraphicsPipeline()  {
     rasterizationInfo.polygonMode = VK_POLYGON_MODE_FILL;
     //TODO: try to enable the wideLines gpu feature
     rasterizationInfo.lineWidth = 1.0f;
-    rasterizationInfo.cullMode = VK_CULL_MODE_NONE;
+    rasterizationInfo.cullMode = VK_CULL_MODE_BACK_BIT;
     rasterizationInfo.frontFace = VK_FRONT_FACE_CLOCKWISE;
     rasterizationInfo.depthBiasEnable = VK_FALSE;
     rasterizationInfo.depthBiasConstantFactor = 0.0f; // Optional
@@ -828,9 +839,12 @@ void EngineGraphics::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDevice
     vkFreeCommandBuffers(engineInit->device, engineInit->commandPool, 1, &transferBuffer);
 }
 
-void EngineGraphics::createCommandBuffers(VkBuffer buffer, VkBuffer indBuffer) {
+void EngineGraphics::createCommandBuffers(VkBuffer buffer, VkBuffer indBuffer, std::vector<std::vector<uint16_t>> allIndices, std::vector<std::vector<data::Vertex>> allVertices) {
     vertexBuffer = buffer;
     indexBuffer = indBuffer;
+    recentIndices = allIndices;
+    recentVertices = allVertices;
+
     //allocate memory for command buffer, you have to create a draw command for each image
     commandBuffers.resize(swapChainFramebuffers.size());
 
@@ -847,15 +861,16 @@ void EngineGraphics::createCommandBuffers(VkBuffer buffer, VkBuffer indBuffer) {
     }
 
     //push all my command buffers into an exectute stage.
-    std::cout << "y" << std::endl;
     //TODO: multithread this process
 
     for (size_t i = 0; i < commandBuffers.size(); i++) {
-        createCommandBuffer(commandBuffers[i], swapChainFramebuffers[i], descriptorSets[0][i], buffer, indBuffer);
+        createCommandBuffer(commandBuffers[i], swapChainFramebuffers[i], descriptorSets[i], buffer, indBuffer, allIndices, allVertices);
     }
 }
 
-void EngineGraphics::createCommandBuffer(VkCommandBuffer commandBuffer, VkFramebuffer framebuffer, VkDescriptorSet descriptorSet, VkBuffer vertexBuffer, VkBuffer indexBuffer) {
+void EngineGraphics::createCommandBuffer(VkCommandBuffer commandBuffer, VkFramebuffer framebuffer, std::vector<VkDescriptorSet> descriptorSet, VkBuffer vertexBuffer, VkBuffer indexBuffer, 
+    std::vector<std::vector<uint16_t>> allIndices, std::vector<std::vector<data::Vertex>> allVertices) {
+
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     beginInfo.flags = 0; // Optional
@@ -907,14 +922,22 @@ void EngineGraphics::createCommandBuffer(VkCommandBuffer commandBuffer, VkFrameb
     vkCmdSetScissor(commandBuffer, 0, 1, &newScissor);
 
     //time for the draw calls
-    const VkDeviceSize offsets[] = { 0, offsetof(data::Vertex2D, color) };
+    const VkDeviceSize offsets[] = { 0, offsetof(data::Vertex, color) };
     vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer, offsets);
     vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
 
     //draw first object (cube)
-    std::cout << "descriptor count: " << descriptorSets[0].size() << std::endl;
-    vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet, 0, nullptr);
-    vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indexCount), 1, 0, 0, 0);
+    uint32_t totalIndexes = 0;
+    uint32_t totalVertices = 0;
+    for (size_t i = 0; i < allIndices.size(); i++) {
+        uint32_t indexCount = static_cast<uint32_t>(allIndices[i].size());
+        uint32_t vertexCount = static_cast<uint32_t>(allVertices[i].size());
+        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet[i], 0, nullptr);
+        vkCmdDrawIndexed(commandBuffer, indexCount, 1, totalIndexes, totalVertices, (uint32_t)0);
+
+        totalIndexes += indexCount;
+        totalVertices += vertexCount;
+    }
     //vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(6), 1, 36, 0, 0);
     //vkCmdNextSubpass(commandBuffers[i], VK_SUBPASS_CONTENTS_INLINE);
     vkCmdEndRenderPass(commandBuffer);

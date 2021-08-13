@@ -20,6 +20,7 @@
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="camera.cpp" />
+    <ClCompile Include="core.cpp" />
     <ClCompile Include="engine.cpp" />
     <ClCompile Include="engine_graphics.cpp" />
     <ClCompile Include="engine_init.cpp" />
@@ -35,6 +36,7 @@
     <ClInclude Include="camera.hpp" />
     <ClInclude Include="common.hpp" />
     <ClInclude Include="data_formats.hpp" />
+    <ClInclude Include="core.hpp" />
     <ClInclude Include="engine.hpp" />
     <ClInclude Include="engine_graphics.hpp" />
     <ClInclude Include="engine_init.hpp" />

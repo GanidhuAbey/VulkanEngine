@@ -6,9 +6,8 @@
 #include "GLFW/glfw3.h"
 
 #include <vector>
+#include <fstream>
 
-extern uint16_t indexCount;
-extern uint16_t vertexCount;
 extern uint16_t objectCount;
 
 extern VkBuffer vertexBuffer;
@@ -29,3 +28,23 @@ struct UniformBufferObject {
     glm::mat4 worldToCamera;
     glm::mat4 projection;
 };
+
+
+static std::vector<char> readFile(const std::string& filename) {
+    std::ifstream file(filename, std::ios::ate | std::ios::binary);
+
+    if (!file.is_open()) {
+        throw std::runtime_error("could not open file");
+    }
+
+    size_t fileSize = (size_t)file.tellg();
+
+    std::vector<char> buffer(fileSize);
+
+    file.seekg(0);
+    file.read(buffer.data(), fileSize);
+    file.close();
+
+    return buffer;
+}
+

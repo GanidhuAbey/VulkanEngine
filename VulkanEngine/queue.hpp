@@ -7,7 +7,7 @@
 #include <optional>
 #include <iostream>
 
-namespace create {
+namespace core {
 class QueueData {
     public:
         std::optional<uint32_t> graphicsFamily;

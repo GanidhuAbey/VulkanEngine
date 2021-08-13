@@ -15,8 +15,6 @@ uint32_t mem::findMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeFilte
         }
     }
 
-    std::cout << "it did not make it here right?" << std::endl;
-
     throw std::runtime_error("could not find appropriate memory type");
 
 }
@@ -55,7 +53,6 @@ void mem::maCreateBuffer(VkPhysicalDevice physicalDevice, VkDevice device, MaBuf
     VkResult allocResult = vkAllocateMemory(device, &memoryInfo, nullptr, &pMemory->memoryHandle);
 
     if (allocResult != VK_SUCCESS) {
-        std::cout << allocResult << std::endl;
         throw std::runtime_error("could not allocate memory for memory pool");
     }
 
@@ -81,14 +78,18 @@ void mem::maCreateImage()  {}
 //RETURNS - NONE
 void mem::maAllocateMemory(VkDeviceSize allocationSize, MaMemory* pMemory) {
     for (auto it = pMemory->locations.rbegin(); it != pMemory->locations.rend(); it++) {
+        //printf("allocation size: %zu", it->size);
         if (it->size >= allocationSize) {
+            //printf("allocation spot size: %zu, allocation size: %zu \n", it->size, allocationSize);
             VkDeviceSize offsetLocation;
             memcpy(&offsetLocation, &(it->offset), sizeof(it->offset));
             pMemory->offset = offsetLocation;
             pMemory->allocate = true;
 
             it->offset = it->offset + allocationSize;
-            it->offset = it->size - allocationSize;
+            it->size = it->size - allocationSize;
+
+            //printf("allocation size afterwards: %zu", it->size);
             break;
         }
     }
@@ -136,6 +137,7 @@ void mem::maMapMemory(VkDevice device, VkDeviceSize dataSize, MaMemory* pMemory,
     if (!pMemory->allocate) {
         throw std::runtime_error("tried to map memory to unallocated data");
     }
+    pMemory->allocate = false;
 
     void* pData;
     if (vkMapMemory(device, pMemory->memoryHandle, pMemory->offset, dataSize, 0, &pData) != VK_SUCCESS) {

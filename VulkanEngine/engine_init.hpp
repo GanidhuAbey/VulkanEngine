@@ -18,7 +18,7 @@
 #include <set>
 #include <map>
 
-namespace create {
+namespace core {
 
 class EngineInit {
     public:
@@ -50,9 +50,6 @@ class EngineInit {
         bool checkSupportedExtensions(std::vector<const char*> requiredExtensions);
         void populateDebugMessengerCreateInfo(VkDebugUtilsMessengerCreateInfoEXT& createInfo);
         bool checkDeviceExtensionSupport(VkPhysicalDevice device);
-
-    public:
-        std::vector<char> readFile(const std::string& fileName);
 };
 
 }

@@ -24,7 +24,7 @@
     <ClCompile Include="eng_window.cpp">
       <Filter>Resource Files</Filter>
     </ClCompile>
-    <ClCompile Include="engine.cpp">
+    <ClCompile Include="core.cpp">
       <Filter>Resource Files</Filter>
     </ClCompile>
     <ClCompile Include="engine_graphics.cpp">
@@ -48,6 +48,9 @@
     <ClCompile Include="swapchain_support.cpp">
       <Filter>Resource Files</Filter>
     </ClCompile>
+    <ClCompile Include="engine.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="camera.hpp">
@@ -62,7 +65,7 @@
     <ClInclude Include="eng_window.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
-    <ClInclude Include="engine.hpp">
+    <ClInclude Include="core.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="engine_graphics.hpp">
@@ -84,6 +87,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="swapchain_support.hpp">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="engine.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

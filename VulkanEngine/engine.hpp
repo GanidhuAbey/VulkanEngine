@@ -1,86 +1,81 @@
 #pragma once
-#include "engine_init.hpp"
-#include "eng_window.hpp"
-#include "engine_graphics.hpp"
-#include "memory_allocator.hpp"
 
-#include "data_formats.hpp"
+#include "core.hpp"
 
-#define GLM_SWIZZLE
-#define GLM_FORCE_RADIANS
-#include "glm/glm.hpp"
+#include <vector>
+#include <glm/glm.hpp>
 
-class Color {
-    public:
-        float red;
-        float green;
-        float blue;
-
-    public:
-        Color(float r, float g, float b) : red{r}, green{g}, blue{b} {};
-};
+//This file will act as the part of the library the user will interact with
 
 namespace create {
+class Color {
+public:
+	float red;
+	float green;
+	float blue;
+
+public:
+	Color(float r, float g, float b) : red{ r }, green{ g }, blue{ b } {};
+};
+
+class UserObject {
+private:
+	size_t index;
+public:
+	glm::mat4 transform;
+	std::vector<data::Vertex> vertices;
+	std::vector<uint16_t> indices;
+
+public:
+	void init(size_t objectIndex);
+	~UserObject();
+public:
+	void addMesh(const std::string& fileName, Color c);
+	void translate(glm::vec3 translate_vector);
+	void scale(float x, float y, float z);
+};
+
+class UserCamera {
+private:
+	glm::vec3 eye;
+	glm::vec3 target;
+	glm::vec3 up;
+public:
+	glm::mat4 worldToCamera;
+	glm::mat4 perspective;
+
+public:
+	void init(glm::vec3 cameraPosition, glm::vec3 cameraDirection, glm::vec3 cameraOrientation, float vertical_fov, float aspect_ratio);
+	~UserCamera();
+public:
+	void update(std::optional<glm::vec3> position = std::nullopt, std::optional<glm::vec3> direction = std::nullopt, std::optional<glm::vec3> camera_up = std::nullopt);
+};
+
 class Engine {
-    private:
-        uint32_t queueG;
-        uint32_t queueP;
+private:
+	std::vector<UserObject*> objectData;
+	std::vector<std::vector<data::Vertex>> allObjectVertices;
+	std::vector<std::vector<uint16_t>> allObjectIndices;
 
-        GLFWwindow* glfWindow;
+	UserCamera* mainCamera;
+	core::Core engineCore;
 
-        uint32_t primitiveCount = 0;
-        
-        glm::mat4 worldToCameraMatrix;
-        glm::mat4 projectionMatrix;
+	uint32_t screenWidth;
+	uint32_t screenHeight;
 
-    public:
-        bool cameraInit = false;
+public:
+	Engine(uint32_t width, uint32_t height, const char* title);
+	~Engine();
 
-        EngWindow userWindow;
-        EngineInit engInit;
-        graphics::EngineGraphics engGraphics;
+public:
+	UserObject* createObject();
+	UserCamera* createCamera(glm::vec3 cameraPosition, glm::vec3 cameraDirection, glm::vec3 cameraOrientation, float vertical_fov);
 
-        int screenWidth;
-        int screenHeight;
+	void captureCursor();
+	bool checkCloseRequest();
+	void getCursorPosition(double* xPos, double* yPos);
+	bool isKeyPressed(WindowInput input);
 
-        mem::MaMemory gpuMemory;
-        mem::MaMemory indexMemory;
-
-        mem::MaMemoryData memoryData;
-        //draw::EngineDraw engineDraw;
-        //in the future we can make this an array of vertices to hold multiple gameobject data.
-
-
-    public:
-        Engine(int w, int h, const char* title);
-        ~Engine();
-
-    public:
-        //refer to brendan galea vid on how to properly seperate gameobjects
-        void Rect(int x, int y, int w, int h, Color c);
-        void clearScreen();
-        void draw();
-        float screenToVulkan(int screenCoord, int screenSize, int vulkanMin);
-        void writeToVertexBuffer(VkDeviceSize dataSize, void* data);
-        void writeToIndexBuffer(VkDeviceSize dataSize, void* data);
-        void addToRenderQueue(uint16_t indexCount);
-        void applyTransform(glm::mat4 transform, size_t objIndex, float camera_angle);
-        void destroyUniformData(size_t objIndex);
-
-        void sendCameraData(glm::mat4 worldToCamera, glm::mat4 projection);
-
-
-    private:
-        void createVertexBuffer(mem::MaMemory* pMemory);
-        void createIndexBuffer(mem::MaMemory* pMemory);
-        void writeToDeviceBuffer(VkDeviceSize dataSize, mem::MaMemory* pMemory, void* data);
-        void createTempBuffer(VkDeviceSize dataSize, VkBufferUsageFlags usage, mem::MaMemory* tempMemory);
-        mem::MaMemory createBuffer(VkBuffer* buffer, VkDeviceSize memorySize, VkBufferUsageFlags usage,
-        VkMemoryPropertyFlags properties);
-        void createUniformBuffer(VkDeviceSize dataSize, mem::MaMemory* pMemory);
-        void writeToLocalBuffer(VkDeviceSize dataSize, mem::MaMemory* pMemory, void* data);
-
-
-
+	void render();
 };
 }

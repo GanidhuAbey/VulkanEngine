@@ -27,7 +27,7 @@ class EngineGraphics {
         VkPipeline graphicsPipeline;
         uint32_t bindingCount = 1;
         uint32_t bufferSize = 0;
-        std::vector<data::Vertex2D> oldVertices;
+        std::vector<data::Vertex> oldVertices;
         std::vector<VkCommandBuffer> commandBuffers;
 
         std::vector<VkDescriptorPool> descriptorPools;
@@ -53,7 +53,7 @@ class EngineGraphics {
 
         VkSwapchainKHR swapChain;
 
-        create::EngineInit* engineInit;
+        core::EngineInit* engineInit;
 
         uint32_t attributeCount = 2;
 
@@ -76,6 +76,9 @@ class EngineGraphics {
         //energy
         std::vector<VkFence> imagesInFlight;
 
+        std::vector<std::vector<uint16_t>> recentIndices;
+        std::vector<std::vector<data::Vertex>> recentVertices;
+
     private:
         void recreateSwapChain();
         void cleanupSwapChain(bool destroyAll);
@@ -88,11 +91,12 @@ class EngineGraphics {
     	void createDepthImage();
         void createImageMemory(VkImage image);
         void createImageView(VkFormat format, VkImageUsageFlags usage, VkImage image, VkImageAspectFlags aspectFlags, VkImageView* imageView);
-        void createCommandBuffer(VkCommandBuffer commandBuffer, VkFramebuffer framebuffer, VkDescriptorSet descriptorSet, VkBuffer vertexBuffer, VkBuffer indexBuffer);
+        void createCommandBuffer(VkCommandBuffer commandBuffer, VkFramebuffer framebuffer, std::vector<VkDescriptorSet> descriptorSet, VkBuffer vertexBuffer, VkBuffer indexBuffer, 
+            std::vector<std::vector<uint16_t>> allIndices, std::vector<std::vector<data::Vertex>> allVertices);
 
     public:
         //EngineGraphics(EngineInit* initEngine);
-        void initialize(create::EngineInit* initEngine);
+        void initialize(core::EngineInit* initEngine);
         ~EngineGraphics();
 
     private:
@@ -107,7 +111,7 @@ class EngineGraphics {
         void createFences();
 
     public:
-        void createCommandBuffers(VkBuffer buffer, VkBuffer indBuffer);
+        void createCommandBuffers(VkBuffer buffer, VkBuffer indBuffer, std::vector<std::vector<uint16_t>> allIndices, std::vector<std::vector<data::Vertex>> allVertices);
         void drawFrame();
         void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize dstOffset, VkDeviceSize size);
         void updateDescriptorSet(VkDescriptorSet decriptorSet, VkDeviceSize bufferSize, VkBuffer buffer);
