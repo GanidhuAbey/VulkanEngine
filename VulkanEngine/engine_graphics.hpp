@@ -78,6 +78,8 @@ class EngineGraphics {
 
         std::vector<std::vector<uint16_t>> recentIndices;
         std::vector<std::vector<data::Vertex>> recentVertices;
+        LightObject recentLightObject;
+        std::vector<PushFragConstant> recentPushConstants;
 
     private:
         void recreateSwapChain();
@@ -92,7 +94,7 @@ class EngineGraphics {
         void createImageMemory(VkImage image);
         void createImageView(VkFormat format, VkImageUsageFlags usage, VkImage image, VkImageAspectFlags aspectFlags, VkImageView* imageView);
         void createCommandBuffer(VkCommandBuffer commandBuffer, VkFramebuffer framebuffer, std::vector<VkDescriptorSet> descriptorSet, VkBuffer vertexBuffer, VkBuffer indexBuffer, 
-            std::vector<std::vector<uint16_t>> allIndices, std::vector<std::vector<data::Vertex>> allVertices);
+            std::vector<std::vector<uint16_t>> allIndices, std::vector<std::vector<data::Vertex>> allVertices, LightObject light, std::vector<PushFragConstant> pfcs);
 
     public:
         //EngineGraphics(EngineInit* initEngine);
@@ -111,7 +113,7 @@ class EngineGraphics {
         void createFences();
 
     public:
-        void createCommandBuffers(VkBuffer buffer, VkBuffer indBuffer, std::vector<std::vector<uint16_t>> allIndices, std::vector<std::vector<data::Vertex>> allVertices);
+        void createCommandBuffers(VkBuffer buffer, VkBuffer indBuffer,  std::vector<std::vector<uint16_t>> allIndices, std::vector<std::vector<data::Vertex>> allVertices, LightObject light, std::vector<PushFragConstant> pfcs);
         void drawFrame();
         void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize dstOffset, VkDeviceSize size);
         void updateDescriptorSet(VkDescriptorSet decriptorSet, VkDeviceSize bufferSize, VkBuffer buffer);

@@ -36,9 +36,6 @@
     <ClCompile Include="error_setup.cpp">
       <Filter>Resource Files</Filter>
     </ClCompile>
-    <ClCompile Include="game_objects.cpp">
-      <Filter>Resource Files</Filter>
-    </ClCompile>
     <ClCompile Include="memory_allocator.cpp">
       <Filter>Resource Files</Filter>
     </ClCompile>
@@ -75,9 +72,6 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="error_setup.hpp">
-      <Filter>Header Files</Filter>
-    </ClInclude>
-    <ClInclude Include="game_objects.hpp">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="memory_allocator.hpp">

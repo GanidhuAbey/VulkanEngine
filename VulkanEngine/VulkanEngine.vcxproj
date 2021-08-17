@@ -26,7 +26,6 @@
     <ClCompile Include="engine_init.cpp" />
     <ClCompile Include="eng_window.cpp" />
     <ClCompile Include="error_setup.cpp" />
-    <ClCompile Include="game_objects.cpp" />
     <ClCompile Include="main.cpp" />
     <ClCompile Include="memory_allocator.cpp" />
     <ClCompile Include="queue.cpp" />
@@ -42,7 +41,6 @@
     <ClInclude Include="engine_init.hpp" />
     <ClInclude Include="eng_window.hpp" />
     <ClInclude Include="error_setup.hpp" />
-    <ClInclude Include="game_objects.hpp" />
     <ClInclude Include="memory_allocator.hpp" />
     <ClInclude Include="queue.hpp" />
     <ClInclude Include="swapchain_support.hpp" />

@@ -32,15 +32,18 @@ int main() {
     //create an object
     create::UserObject* someObject = engine.createObject();
     //add some mesh data to this object
-    someObject->addMesh("objects/test_object/test.obj", create::Color(1.0, 0., 0.0));
+    auto t1 = std::chrono::high_resolution_clock::now();
+    someObject->addMesh("objects/test_object/test.obj", create::Color(0.1, 0.2, 0.6));
+    auto t2 = std::chrono::high_resolution_clock::now();
+    std::chrono::duration<double, std::milli> ms_double = t2 - t1;
+    printf("object load time: %f \n", ms_double.count());
 
-    //create light object
-    create::UserObject* light = engine.createObject();
-    light->addMesh("objects/test_object/test.obj", create::Color(1.0, 1.0, 1.0));
-    light->translate(glm::vec3(5.0, 0.0, 0.0));
-    light->scale(0.1, 0.1, 0.1);
+
+    //create light source
+    create::LightSource* light = engine.createLight(glm::vec3(1, -3.0, 3.0), create::Color(1.0, 1.0, 1.0));
     
-   
+    printf("the colour of this light is : <%f  %f  %f> \n", light->light.color.x, light->light.color.y, light->light.color.z);
+
     int frameCount = 0;
     //in radians
     float angle = 0.0f;

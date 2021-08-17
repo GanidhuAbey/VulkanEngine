@@ -29,7 +29,7 @@ void EngineGraphics::recreateSwapChain() {
     createRenderPass(); //
     //createGraphicsPipeline(); //
     createFrameBuffers(); //
-    createCommandBuffers(vertexBuffer, indexBuffer, recentIndices, recentVertices); //
+    createCommandBuffers(vertexBuffer, indexBuffer, recentIndices, recentVertices, recentLightObject, recentPushConstants); //
 }
 
 void EngineGraphics::cleanupSwapChain(bool destroyAll) {
@@ -622,13 +622,21 @@ void EngineGraphics::createGraphicsPipeline()  {
     posAttribute.format = VK_FORMAT_R32G32B32_SFLOAT;
     posAttribute.offset = 0;
 
+    /*
     VkVertexInputAttributeDescription colorAttribute{};
     colorAttribute.location = 1;
     colorAttribute.binding = 0;
     colorAttribute.format = VK_FORMAT_R32G32B32_SFLOAT;
     colorAttribute.offset = offsetof(data::Vertex, color);
+    */
 
-    VkVertexInputAttributeDescription attributeDescriptions[] = {posAttribute, colorAttribute};
+    VkVertexInputAttributeDescription normalAttribute{};
+    normalAttribute.location = 1;
+    normalAttribute.binding = 0;
+    normalAttribute.format = VK_FORMAT_R32G32B32_SFLOAT;
+    normalAttribute.offset = offsetof(data::Vertex, normal);
+
+    VkVertexInputAttributeDescription attributeDescriptions[] = {posAttribute, normalAttribute};
 
     vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions;
 
@@ -726,6 +734,16 @@ void EngineGraphics::createGraphicsPipeline()  {
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
     pipelineLayoutInfo.setLayoutCount = 1;
     pipelineLayoutInfo.pSetLayouts = &setLayout;
+    pipelineLayoutInfo.pushConstantRangeCount = 1;
+
+    VkPushConstantRange pushRange{};
+    pushRange.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    pushRange.offset = 0;
+    pushRange.size = sizeof(LightObject) + sizeof(PushFragConstant);
+
+    VkPushConstantRange pushRanges[] = { pushRange };
+
+    pipelineLayoutInfo.pPushConstantRanges = pushRanges;
 
     if (vkCreatePipelineLayout(engineInit->device, &pipelineLayoutInfo, nullptr, &pipelineLayout) != VK_SUCCESS) {
         throw std::runtime_error("could not create pipeline layout");
@@ -839,11 +857,14 @@ void EngineGraphics::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDevice
     vkFreeCommandBuffers(engineInit->device, engineInit->commandPool, 1, &transferBuffer);
 }
 
-void EngineGraphics::createCommandBuffers(VkBuffer buffer, VkBuffer indBuffer, std::vector<std::vector<uint16_t>> allIndices, std::vector<std::vector<data::Vertex>> allVertices) {
+void EngineGraphics::createCommandBuffers(VkBuffer buffer, VkBuffer indBuffer, std::vector<std::vector<uint16_t>> allIndices, std::vector<std::vector<data::Vertex>> allVertices, LightObject light, 
+    std::vector<PushFragConstant> pfcs) {
     vertexBuffer = buffer;
     indexBuffer = indBuffer;
     recentIndices = allIndices;
     recentVertices = allVertices;
+    recentLightObject = light;
+    recentPushConstants = pfcs;
 
     //allocate memory for command buffer, you have to create a draw command for each image
     commandBuffers.resize(swapChainFramebuffers.size());
@@ -864,12 +885,12 @@ void EngineGraphics::createCommandBuffers(VkBuffer buffer, VkBuffer indBuffer, s
     //TODO: multithread this process
 
     for (size_t i = 0; i < commandBuffers.size(); i++) {
-        createCommandBuffer(commandBuffers[i], swapChainFramebuffers[i], descriptorSets[i], buffer, indBuffer, allIndices, allVertices);
+        createCommandBuffer(commandBuffers[i], swapChainFramebuffers[i], descriptorSets[i], buffer, indBuffer, allIndices, allVertices, light, pfcs);
     }
 }
 
 void EngineGraphics::createCommandBuffer(VkCommandBuffer commandBuffer, VkFramebuffer framebuffer, std::vector<VkDescriptorSet> descriptorSet, VkBuffer vertexBuffer, VkBuffer indexBuffer, 
-    std::vector<std::vector<uint16_t>> allIndices, std::vector<std::vector<data::Vertex>> allVertices) {
+    std::vector<std::vector<uint16_t>> allIndices, std::vector<std::vector<data::Vertex>> allVertices, LightObject light, std::vector<PushFragConstant> pfcs) {
 
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -922,16 +943,20 @@ void EngineGraphics::createCommandBuffer(VkCommandBuffer commandBuffer, VkFrameb
     vkCmdSetScissor(commandBuffer, 0, 1, &newScissor);
 
     //time for the draw calls
-    const VkDeviceSize offsets[] = { 0, offsetof(data::Vertex, color) };
+    const VkDeviceSize offsets[] = { 0, offsetof(data::Vertex, normal)};
     vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer, offsets);
     vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
 
     //draw first object (cube)
     uint32_t totalIndexes = 0;
     uint32_t totalVertices = 0;
+    
+    //universal to every object so i can push the light constants before the for loop
+    vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(light), &light);
     for (size_t i = 0; i < allIndices.size(); i++) {
         uint32_t indexCount = static_cast<uint32_t>(allIndices[i].size());
         uint32_t vertexCount = static_cast<uint32_t>(allVertices[i].size());
+        vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(light), sizeof(pfcs[i]), &pfcs[i]);
         vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet[i], 0, nullptr);
         vkCmdDrawIndexed(commandBuffer, indexCount, 1, totalIndexes, totalVertices, (uint32_t)0);
 

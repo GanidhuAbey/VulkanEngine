@@ -53,6 +53,7 @@ class Core {
         float screenToVulkan(int screenCoord, int screenSize, int vulkanMin);
         void writeToVertexBuffer(VkDeviceSize dataSize, void* data);
         void writeToIndexBuffer(VkDeviceSize dataSize, void* data);
+        void writeToNormalBuffer(VkDeviceSize dataSize, void* data);
         void applyTransform(glm::mat4 transform, size_t objIndex, float camera_angle);
         void destroyUniformData(size_t objIndex);
 
@@ -61,11 +62,12 @@ class Core {
         bool hasUniformBuffer(size_t objIndex);
         void attachData(UniformBufferObject ubo);
         void updateData(UniformBufferObject ubo, size_t objIndex);
-        void createCommands(std::vector<std::vector<uint16_t>> allIndices, std::vector<std::vector<data::Vertex>> allVertices);
+        void createCommands(std::vector<std::vector<uint16_t>> allIndices, std::vector<std::vector<data::Vertex>> allVertices, LightObject light, std::vector<PushFragConstant> pfcs);
 
 
     private:
         void createVertexBuffer(mem::MaMemory* pMemory);
+        void createNormalBuffer(mem::MaMemory* pMemory);
         void createIndexBuffer(mem::MaMemory* pMemory);
         void writeToDeviceBuffer(VkDeviceSize dataSize, mem::MaMemory* pMemory, void* data);
         void createTempBuffer(VkDeviceSize dataSize, VkBufferUsageFlags usage, mem::MaMemory* tempMemory);

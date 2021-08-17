@@ -18,13 +18,26 @@ public:
 	Color(float r, float g, float b) : red{ r }, green{ g }, blue{ b } {};
 };
 
+
+class LightSource {
+public:
+	LightObject light;
+public:
+	void init(glm::vec3 pos, Color lightColor);
+	void update(std::optional<glm::vec3> pos = std::nullopt, std::optional<Color> lightColor = std::nullopt);
+	~LightSource();
+};
+
 class UserObject {
 private:
 	size_t index;
+	std::vector<uint16_t> normalIndices;
 public:
 	glm::mat4 transform;
 	std::vector<data::Vertex> vertices;
 	std::vector<uint16_t> indices;
+	
+	PushFragConstant pfc;
 
 public:
 	void init(size_t objectIndex);
@@ -56,12 +69,15 @@ private:
 	std::vector<UserObject*> objectData;
 	std::vector<std::vector<data::Vertex>> allObjectVertices;
 	std::vector<std::vector<uint16_t>> allObjectIndices;
+	std::vector<PushFragConstant> allFragConstants;
 
 	UserCamera* mainCamera;
 	core::Core engineCore;
 
 	uint32_t screenWidth;
 	uint32_t screenHeight;
+
+	LightSource light;
 
 public:
 	Engine(uint32_t width, uint32_t height, const char* title);
@@ -70,6 +86,7 @@ public:
 public:
 	UserObject* createObject();
 	UserCamera* createCamera(glm::vec3 cameraPosition, glm::vec3 cameraDirection, glm::vec3 cameraOrientation, float vertical_fov);
+	LightSource* createLight(glm::vec3 pos, Color lightColor);
 
 	void captureCursor();
 	bool checkCloseRequest();

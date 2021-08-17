@@ -1,6 +1,5 @@
 #include "engine.hpp"
 #include "camera.hpp"
-#include "game_objects.hpp"
 #include "data_formats.hpp"
 
 #include <string>
@@ -15,6 +14,7 @@ Engine::Engine(uint32_t width, uint32_t height, const char* title) {
     mainCamera = new UserCamera;
 
 	engineCore.init(screenWidth, screenHeight, title);
+    light.init(glm::vec3(0.0, 0.0, 0.0), Color(0.0, 0.0, 0.0));
 }
 
 void Engine::render() {
@@ -31,19 +31,19 @@ void Engine::render() {
 			//create vertex and index data
 			std::vector<data::Vertex> vertices = objectData[i]->vertices;
 			std::vector<uint16_t> indices = objectData[i]->indices;
+            PushFragConstant pfc = objectData[i]->pfc;
 
 			allObjectVertices.push_back(vertices);
 			allObjectIndices.push_back(indices);
+            allFragConstants.push_back(pfc);
 
-            printf("mark here \n");
-            printf("color data: <%f %f %f> \n", vertices[0].color.x, vertices[0].color.y, vertices[0].color.z);
 			engineCore.writeToVertexBuffer(sizeof(vertices[0]) * vertices.size(), vertices.data());
 			engineCore.writeToIndexBuffer(sizeof(indices[0]) * indices.size(), indices.data());
-            printf("mark end \n");
+
 			//create uniform buffers to attach data to
 			engineCore.attachData(ubo);
 
-			engineCore.createCommands(allObjectIndices, allObjectVertices);
+            engineCore.createCommands(allObjectIndices, allObjectVertices, light.light, allFragConstants);
 
             
 		}
@@ -164,6 +164,9 @@ void UserObject::addMesh(const std::string& fileName, Color c) {
     std::vector<float> vt;
     std::vector<float> vn;
 
+    std::vector<glm::vec4> vertice_data;
+    std::vector<glm::vec4> normal_data;
+
     //when vt and vn are needed we can just add more variables here
     int vCount = 0;
     int vLineCount = 0;
@@ -184,12 +187,23 @@ void UserObject::addMesh(const std::string& fileName, Color c) {
         if (name == "v" && number && found) {
             vCount++;
             v.push_back(std::stof(value));
+            size_t v_size = v.size();
+            if (v_size % 3 == 0) {
+                //a vec3 can be formed now
+                glm::vec4 vertice = glm::vec4(v[v_size - 3], v[v_size - 2], v[v_size - 1], 0.0);
+                vertice_data.push_back(vertice);
+            }
             value = "";
         }
 
         if (name == "vn" && number && found) {
             vnCount++;
             vn.push_back(std::stof(value));
+            size_t vn_size = vn.size();
+            if (vn_size % 3 == 0) {
+                glm::vec4 normal = glm::vec4(vn[vn_size - 3], vn[vn_size - 2], vn[vn_size - 1], 0.0);
+                normal_data.push_back(normal);
+            }
             value = "";
         }
 
@@ -204,7 +218,17 @@ void UserObject::addMesh(const std::string& fileName, Color c) {
                 count++;
                 value.erase(0, pos + delimiter.length());
             }
-            indices.push_back(index_types[0] - 1);
+            delimiter = "\n";
+            pos = value.find(delimiter);
+            std::string token = value.substr(0, pos);
+            index_types[count] = static_cast<uint16_t>(std::stoul(token));
+            value.erase(0, pos + delimiter.length());
+
+            uint16_t normal_index = index_types[2] - 1;
+            uint16_t vertex_index = index_types[0] - 1;
+            indices.push_back(vertex_index);
+            normalIndices.push_back(normal_index);
+
             value = "";
         }
 
@@ -229,32 +253,49 @@ void UserObject::addMesh(const std::string& fileName, Color c) {
 
     }
 
-    size_t vDataCount = vCount / vLineCount;
+    std::vector<uint16_t> newIndices;
+    for (size_t i = 0; i < indices.size(); i++) {
+        glm::vec4 vertice = vertice_data[indices[i]];
+        glm::vec4 normal = normal_data[normalIndices[i]];
 
-    size_t indexValue = 0;
-    //last step is to convert them to our format
-    for (size_t i = 0; i < v.size() / vDataCount; i++) {
-        //for now i only accept sizes of 3
-        if (vDataCount != 3) {
-            printf("WARNING: obj file containts vector-%zu but expected vector-3", vDataCount);
-        }
-
-        //now we use this to create the vec4 we need
-        size_t index = 3 * i;
-        glm::vec4 vertice = glm::vec4(v[index], v[index + 1], v[index + 2], 0.0);
-
-        //materials haven't been implemented so we'll just do a default value here
-        glm::vec3 color = glm::vec3(c.red, c.green, c.blue);
-
-        data::Vertex vertex = {
-            vertice,
-            color
-        };
+        data::Vertex vertex{};
+        vertex.position = vertice;
+        vertex.normal = normal;
 
         vertices.push_back(vertex);
-
-        indexValue++;
+        newIndices.push_back(static_cast<uint16_t>(i));
+        //printf("%u \n", i);
     }
+
+    indices = newIndices;
+
+    pfc.color = glm::vec4(c.red, c.green, c.blue, 0.0);
 }
 
 UserObject::~UserObject() {}
+
+
+/*------------------ Light Creation --------------------*/
+LightSource* Engine::createLight(glm::vec3 pos, Color lightColor) {
+    UserObject* lightObject = createObject();
+    lightObject->addMesh("objects/test_object/test.obj", lightColor);
+    lightObject->translate(pos);
+    lightObject->scale(0.1, 0.1, 0.1);
+
+    light.update(pos, lightColor);
+
+    return &light;
+}
+
+void LightSource::init(glm::vec3 pos, Color lightColor) {
+    //lets quickly add some small mesh data to this object just for fun.
+    light.color = glm::vec4(lightColor.red, lightColor.green, lightColor.blue, 0.0);
+    light.position = glm::vec4(pos, 0.0);
+}
+
+void LightSource::update(std::optional<glm::vec3> pos, std::optional<Color> lightColor) {
+    light.color = (lightColor.has_value()) ? glm::vec4(lightColor.value().red, lightColor.value().green, lightColor.value().blue, 0.0) : light.color;
+    light.position = (pos.has_value()) ? glm::vec4(pos.value(), 0.0) : light.position;
+}
+
+LightSource::~LightSource() {}

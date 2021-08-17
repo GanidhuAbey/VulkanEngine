@@ -79,9 +79,9 @@ void Core::updateData(UniformBufferObject ubo, size_t objIndex) {
     writeToLocalBuffer(sizeof(ubo), &engGraphics.uniformBufferData[objIndex], &ubo);
 }
 
-void Core::createCommands(std::vector<std::vector<uint16_t>> allIndices, std::vector<std::vector<data::Vertex>> allVertices) {
+void Core::createCommands(std::vector<std::vector<uint16_t>> allIndices, std::vector<std::vector<data::Vertex>> allVertices, LightObject light, std::vector<PushFragConstant> pfcs) {
     //needs to create command buffers
-    engGraphics.createCommandBuffers(gpuMemory.buffer, indexMemory.buffer, allIndices, allVertices);
+    engGraphics.createCommandBuffers(gpuMemory.buffer, indexMemory.buffer, allIndices, allVertices, light, pfcs);
 }
 
 /// - PURPOSE - 
@@ -157,6 +157,8 @@ void Core::createUniformBuffer(VkDeviceSize dataSize, mem::MaMemory* pMemory) {
     bufferInfo.pQueueFamilyIndices = &queueG;
     bufferInfo.memoryProperties = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 
+    printf("creating uniform buffer \n");
+
     mem::maCreateBuffer(engInit.physicalDevice, engInit.device, &bufferInfo, pMemory);
 }
 
@@ -223,6 +225,8 @@ void Core::createTempBuffer(VkDeviceSize dataSize, VkBufferUsageFlags usage, mem
     bufferInfo.pQueueFamilyIndices = &queueG;
     bufferInfo.memoryProperties = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 
+    printf("creating temp buffer \n");
+
     mem::maCreateBuffer(engInit.physicalDevice, engInit.device, &bufferInfo, tempMemory);
 
     //allocate memory for temp buffer
@@ -265,6 +269,8 @@ void Core::createVertexBuffer(mem::MaMemory* pMemory) {
     bufferInfo.pQueueFamilyIndices = &queueG;
     bufferInfo.memoryProperties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 
+    printf("creating vertex buffer \n");
+
     mem::maCreateBuffer(engInit.physicalDevice, engInit.device, &bufferInfo, pMemory);
 }
 
@@ -281,6 +287,8 @@ void Core::createIndexBuffer(mem::MaMemory* pMemory) {
     bufferInfo.queueFamilyIndexCount = 1;
     bufferInfo.pQueueFamilyIndices = &queueG;
     bufferInfo.memoryProperties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+
+    printf("creating index buffer \n");
 
     mem::maCreateBuffer(engInit.physicalDevice, engInit.device, &bufferInfo, pMemory);
 }
