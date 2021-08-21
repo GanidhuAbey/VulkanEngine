@@ -1,9 +1,14 @@
 #pragma once
 
 #include "core.hpp"
+#include "mesh.hpp"
 
 #include <vector>
 #include <glm/glm.hpp>
+
+#include <assimp/Importer.hpp>      // C++ importer interface
+#include <assimp/scene.h>           // Output data structure
+#include <assimp/postprocess.h>     // Post processing flags
 
 //This file will act as the part of the library the user will interact with
 
@@ -31,11 +36,11 @@ public:
 class UserObject {
 private:
 	size_t index;
-	std::vector<uint16_t> normalIndices;
+	std::vector<uint32_t> normalIndices;
 public:
 	glm::mat4 transform;
-	std::vector<data::Vertex> vertices;
-	std::vector<uint16_t> indices;
+
+	mesh::Mesh objectMesh;
 	
 	PushFragConstant pfc;
 
@@ -68,8 +73,10 @@ class Engine {
 private:
 	std::vector<UserObject*> objectData;
 	std::vector<std::vector<data::Vertex>> allObjectVertices;
-	std::vector<std::vector<uint16_t>> allObjectIndices;
+	std::vector<std::vector<uint32_t>> allObjectIndices;
 	std::vector<PushFragConstant> allFragConstants;
+
+	std::vector<mesh::Mesh> allMeshData;
 
 	UserCamera* mainCamera;
 	core::Core engineCore;
@@ -95,4 +102,13 @@ public:
 
 	void render();
 };
+
+void accessVertices(aiNode* node, aiMesh** const meshes, data::Vertex* meshVertices, uint32_t* p, uint32_t* offset, bool writeTo);
+void accessIndices(aiNode* node, aiMesh** const meshes, uint32_t* meshIndices, uint32_t* p, uint32_t* offset, uint32_t* meshOffset, bool writeTo);
+std::vector<data::Vertex> accessDataVert(aiNode* node, aiMesh** const meshes, std::vector<data::Vertex> vertices);
+std::vector<uint32_t> accessDataIndex(aiNode* node, aiMesh** const meshes, std::vector<uint32_t> indices, uint32_t* meshOffset);
+
+data::Vertex createVertexFromAssimp(aiMesh* mesh, unsigned int index);
+uint32_t createIndexFromAssimp(aiMesh* mesh, unsigned int index);
+
 }

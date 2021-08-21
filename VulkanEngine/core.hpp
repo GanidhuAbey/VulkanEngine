@@ -3,6 +3,7 @@
 #include "eng_window.hpp"
 #include "engine_graphics.hpp"
 #include "memory_allocator.hpp"
+#include "mesh.hpp"
 
 #include "data_formats.hpp"
 
@@ -51,8 +52,8 @@ class Core {
         //refer to brendan galea vid on how to properly seperate gameobjects
         void draw();
         float screenToVulkan(int screenCoord, int screenSize, int vulkanMin);
-        void writeToVertexBuffer(VkDeviceSize dataSize, void* data);
-        void writeToIndexBuffer(VkDeviceSize dataSize, void* data);
+        void writeToVertexBuffer(std::vector<data::Vertex> vertices);
+        void writeToIndexBuffer(std::vector<uint32_t> indices);
         void writeToNormalBuffer(VkDeviceSize dataSize, void* data);
         void applyTransform(glm::mat4 transform, size_t objIndex, float camera_angle);
         void destroyUniformData(size_t objIndex);
@@ -62,7 +63,7 @@ class Core {
         bool hasUniformBuffer(size_t objIndex);
         void attachData(UniformBufferObject ubo);
         void updateData(UniformBufferObject ubo, size_t objIndex);
-        void createCommands(std::vector<std::vector<uint16_t>> allIndices, std::vector<std::vector<data::Vertex>> allVertices, LightObject light, std::vector<PushFragConstant> pfcs);
+        void createCommands(std::vector<mesh::Mesh> allMeshData, LightObject light, std::vector<PushFragConstant> pfcs);
 
 
     private:

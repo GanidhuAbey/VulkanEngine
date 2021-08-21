@@ -29,21 +29,23 @@ void Engine::render() {
 		//each object has its vertex, index, and uniform data but its not know whether this data is already attached or not
 		if (!engineCore.hasUniformBuffer(i)) {
 			//create vertex and index data
-			std::vector<data::Vertex> vertices = objectData[i]->vertices;
-			std::vector<uint16_t> indices = objectData[i]->indices;
+			mesh::Mesh currentMesh = objectData[i]->objectMesh;
             PushFragConstant pfc = objectData[i]->pfc;
 
-			allObjectVertices.push_back(vertices);
-			allObjectIndices.push_back(indices);
             allFragConstants.push_back(pfc);
 
-			engineCore.writeToVertexBuffer(sizeof(vertices[0]) * vertices.size(), vertices.data());
-			engineCore.writeToIndexBuffer(sizeof(indices[0]) * indices.size(), indices.data());
+			allMeshData.push_back(currentMesh);
+
+			std::vector<data::Vertex> verts = currentMesh.getVertexData();
+			std::vector<uint32_t> indexes = currentMesh.getIndexData();
+
+			engineCore.writeToVertexBuffer(verts);
+			engineCore.writeToIndexBuffer(indexes);
 
 			//create uniform buffers to attach data to
 			engineCore.attachData(ubo);
 
-            engineCore.createCommands(allObjectIndices, allObjectVertices, light.light, allFragConstants);
+            engineCore.createCommands(allMeshData, light.light, allFragConstants);
 
             
 		}
@@ -145,132 +147,157 @@ void UserObject::scale(float x, float y, float z) {
 }
 
 void UserObject::addMesh(const std::string& fileName, Color c) {
-    //convert mesh data into vertices and index data.
-    std::vector<char> meshData = readFile(fileName);
+    //just going to use the assimp library for this
+	objectMesh.addMesh(fileName);	
+	
+	//now we have both vertices and indices
+	pfc.color = glm::vec4(c.red, c.green, c.blue, 0.0);
 
-    //iterate through the meshData file
-    bool ignore_line = false;
-    bool found = false;
-    bool number = false;
-    char desired = 'x';
-
-    std::string value = "";
-    std::string name = "";
-
-    std::vector<char> vert_data;
-    std::vector<char> index_data;
-
-    std::vector<float> v;
-    std::vector<float> vt;
-    std::vector<float> vn;
-
-    std::vector<glm::vec4> vertice_data;
-    std::vector<glm::vec4> normal_data;
-
-    //when vt and vn are needed we can just add more variables here
-    int vCount = 0;
-    int vLineCount = 0;
-
-    int vnCount = 0;
-    int vnLineCount = 0;
-
-    for (size_t i = 0; i < meshData.size(); i++) {
-        char data = meshData[i];
-        if (found && data != ' ' && data != '\n') {
-            value += data;
-        }
-        else {
-            number = true;
-        }
-
-        //generated a value now we determine where to add it
-        if (name == "v" && number && found) {
-            vCount++;
-            v.push_back(std::stof(value));
-            size_t v_size = v.size();
-            if (v_size % 3 == 0) {
-                //a vec3 can be formed now
-                glm::vec4 vertice = glm::vec4(v[v_size - 3], v[v_size - 2], v[v_size - 1], 0.0);
-                vertice_data.push_back(vertice);
-            }
-            value = "";
-        }
-
-        if (name == "vn" && number && found) {
-            vnCount++;
-            vn.push_back(std::stof(value));
-            size_t vn_size = vn.size();
-            if (vn_size % 3 == 0) {
-                glm::vec4 normal = glm::vec4(vn[vn_size - 3], vn[vn_size - 2], vn[vn_size - 1], 0.0);
-                normal_data.push_back(normal);
-            }
-            value = "";
-        }
-
-        if (name == "f" && number && found) {
-            std::string delimiter = "/";
-            size_t count = 0;
-            size_t pos = 0;
-            std::vector<uint16_t> index_types(3); // im gonna regret putting a constant here ...
-            while ((pos = value.find(delimiter)) != std::string::npos) {
-                std::string token = value.substr(0, pos);
-                index_types[count] = static_cast<uint16_t>(std::stoul(token));
-                count++;
-                value.erase(0, pos + delimiter.length());
-            }
-            delimiter = "\n";
-            pos = value.find(delimiter);
-            std::string token = value.substr(0, pos);
-            index_types[count] = static_cast<uint16_t>(std::stoul(token));
-            value.erase(0, pos + delimiter.length());
-
-            uint16_t normal_index = index_types[2] - 1;
-            uint16_t vertex_index = index_types[0] - 1;
-            indices.push_back(vertex_index);
-            normalIndices.push_back(normal_index);
-
-            value = "";
-        }
-
-        if (data != ' ' && !found) {
-            name += data;
-        }
-        else {
-            found = true;
-            number = false;
-            //value = "";
-        }
-
-        if (meshData[i] == '\n') {
-            if (name == "v") vLineCount++;
-            if (name == "vn") vnLineCount++;
-
-            name = "";
-            value = "";
-            number = false;
-            found = false;
-        }
-
-    }
-
-    std::vector<uint16_t> newIndices;
-    for (size_t i = 0; i < indices.size(); i++) {
-        glm::vec4 vertice = vertice_data[indices[i]];
-        glm::vec4 normal = normal_data[normalIndices[i]];
-
-        data::Vertex vertex{};
-        vertex.position = vertice;
-        vertex.normal = normal;
-
-        vertices.push_back(vertex);
-        newIndices.push_back(static_cast<uint16_t>(i));
-        //printf("%u \n", i);
-    }
-
-    indices = newIndices;
-
-    pfc.color = glm::vec4(c.red, c.green, c.blue, 0.0);
 }
+
+data::Vertex create::createVertexFromAssimp(aiMesh* mesh, unsigned int index) {
+	aiVector3D position = mesh->mVertices[index];
+	aiVector3D normal = mesh->mNormals[index];
+
+	data::Vertex vertex = {
+		glm::vec4(position.x, position.y, position.z, 0.0),
+		glm::vec4(normal.x, normal.y, normal.z, 0.0)
+	};
+
+	return vertex;
+}
+
+std::vector<data::Vertex> create::accessDataVert(aiNode* node, aiMesh** const meshes, std::vector<data::Vertex> vertices) {
+	unsigned int meshCount = node->mNumMeshes;
+
+	for (unsigned int i = 0; i < meshCount; i++) {
+		aiMesh* currentMesh = meshes[node->mMeshes[i]];
+		unsigned int vertexCount = currentMesh->mNumVertices;
+		for (unsigned int j = 0; j < vertexCount; j++) {
+			vertices.push_back(createVertexFromAssimp(currentMesh, j));
+		}
+		//*meshOffset = *meshOffset + currentMesh->mNumVertices;
+	}
+
+	for (unsigned int k = 0; k < node->mNumChildren; k++) {
+		auto it = vertices.end();
+		std::vector<data::Vertex> vertices_branch = accessDataVert(node->mChildren[k], meshes, vertices_branch);
+		vertices.insert(it, vertices_branch.begin(), vertices_branch.end());
+	}
+
+	return vertices;
+}
+
+std::vector<uint32_t> create::accessDataIndex(aiNode* node, aiMesh** const meshes, std::vector<uint32_t> indices, uint32_t* meshOffset) {
+	unsigned int meshCount = node->mNumMeshes;
+	
+	for (unsigned int i = 0; i < meshCount; i++) {
+		aiMesh* currentMesh = meshes[node->mMeshes[i]];
+		unsigned int indexCount = currentMesh->mNumFaces;
+		for (unsigned int j = 0; j < indexCount; j++) {
+			aiFace face = currentMesh->mFaces[j];
+			if (face.mNumIndices == 3) {
+				indices.push_back(face.mIndices[0] + *meshOffset);
+				indices.push_back(face.mIndices[1] + *meshOffset);
+				indices.push_back(face.mIndices[2] + *meshOffset);
+			}
+		}
+		*meshOffset = *meshOffset + currentMesh->mNumVertices;
+	}
+
+	for (unsigned int k = 0; k < node->mNumChildren; k++) {
+		auto it = indices.end();
+		std::vector<uint32_t> index_branch = accessDataIndex(node->mChildren[k], meshes, index_branch, meshOffset);
+		indices.insert(it, index_branch.begin(), index_branch.end());
+	}
+
+	return indices;
+}
+
+void create::accessIndices(aiNode* node, aiMesh** const meshes, uint32_t* meshIndices, uint32_t* p, uint32_t* offset, uint32_t* meshOffset, bool writeTo) {
+	unsigned int meshCount = node->mNumMeshes;
+
+	unsigned int offsetBy = 0;
+	for (unsigned int i = 0; i < meshCount; i++) {
+		aiMesh* currentMesh = meshes[node->mMeshes[i]];
+		unsigned int indicesCount = currentMesh->mNumFaces;
+		unsigned int indexOffset = 0;
+		unsigned int currentDex = 0;
+		for (unsigned int j = 0; j < indicesCount; j++) {
+			aiFace face = currentMesh->mFaces[j];
+			if (writeTo && face.mNumIndices == 3) {
+				//printf("the index being accessed is : %u \n", *offset + meshOffset + j);
+				//currentDex = *offset + meshOffset + indexOffset + j;
+				//printf("!| %u | \n", meshOffset);
+				meshIndices[*offset] = face.mIndices[0] + *meshOffset;
+				meshIndices[*offset + 1] = face.mIndices[1] + *meshOffset;
+				meshIndices[*offset + 2] = face.mIndices[2] + *meshOffset;
+				indexOffset += 2;
+			}
+			else if (face.mNumIndices == 3) {
+				//printf("~ | %u | \n", *p);
+				*p = *p + 3;
+			}
+
+			if (face.mNumIndices == 3) {
+				*offset = *offset + 3;
+			}
+		}
+		//meshOffset = currentDex + 3;
+		*meshOffset = *meshOffset + currentMesh->mNumVertices;
+	}
+	
+	//*offset = meshOffset;
+	//printf("[==================================================] \n");
+	for (size_t k = 0; k < node->mNumChildren; k++) {
+		//printf("hello was up: %u \n", meshes[node->mChildren[k]->mMeshes[0]]->mFaces[0].mIndices[1]);
+		accessIndices(node->mChildren[k], meshes, meshIndices, p, offset, meshOffset, writeTo);
+	}
+}
+
+void create::accessVertices(aiNode* node, aiMesh** const meshes, data::Vertex* positions, uint32_t* p, uint32_t* offset, bool writeTo) {
+	unsigned int meshCount = node->mNumMeshes;
+	unsigned int meshOffset = 0;
+
+	for (unsigned int i = 0; i < meshCount; i++) {
+		aiMesh* currentMesh = meshes[node->mMeshes[i]];
+		unsigned int verticesCount = currentMesh->mNumVertices;
+		for (unsigned int j = 0; j < verticesCount; j++) {
+			if (writeTo) {
+				//record vertices from mesh
+				aiVector3D normal = currentMesh->mNormals[j];
+				aiVector3D position = currentMesh->mVertices[j];
+				
+				//printf("<%f %f %f> \n", position.x, position.y, position.z);
+				//printf("indexes: %u \n", *offset);
+				glm::vec4 convertedPosition = glm::vec4(position.x, position.y, position.z, 0.0);
+				positions[*offset].position = convertedPosition;
+				positions[*offset].normal = glm::vec4(normal.x, normal.y, normal.z, 0.0);
+			}
+			else {
+				//printf("indice: %u \n", *p);
+				*p = *p + 1;
+			}
+			*offset = *offset + 1;
+		}
+		meshOffset += verticesCount;
+	}	
+
+	//*offset = *offset + meshOffset;
+	for (size_t j = 0; j < node->mNumChildren; j++) {
+		accessVertices(node->mChildren[j], meshes, positions, p, offset, writeTo);
+	}
+}
+
+
+
+//A
+//C
+//B
+//A
+//C
+//B
+
 
 UserObject::~UserObject() {}
 

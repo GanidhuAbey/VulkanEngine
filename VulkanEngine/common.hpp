@@ -8,7 +8,7 @@
 #include <vector>
 #include <fstream>
 
-extern uint16_t objectCount;
+extern uint32_t objectCount;
 
 extern VkBuffer vertexBuffer;
 extern VkBuffer indexBuffer;

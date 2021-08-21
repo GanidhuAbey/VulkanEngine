@@ -350,7 +350,8 @@ void EngineInit::createSurface()
 void EngineInit::pickPhysicalDevice()
 {
     uint32_t deviceCount = 0;
-    vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
+    
+    VkResult physicalDeviceSearchResult = vkEnumeratePhysicalDevices(instance, &deviceCount, nullptr);
 
     if (deviceCount == 0)
     {

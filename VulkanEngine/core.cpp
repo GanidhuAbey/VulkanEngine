@@ -6,7 +6,7 @@
 using namespace core;
 
 //define some global variables.
-uint16_t objectCount = 0;
+uint32_t objectCount = 0;
 
 VkBuffer vertexBuffer;
 VkBuffer indexBuffer;
@@ -79,9 +79,9 @@ void Core::updateData(UniformBufferObject ubo, size_t objIndex) {
     writeToLocalBuffer(sizeof(ubo), &engGraphics.uniformBufferData[objIndex], &ubo);
 }
 
-void Core::createCommands(std::vector<std::vector<uint16_t>> allIndices, std::vector<std::vector<data::Vertex>> allVertices, LightObject light, std::vector<PushFragConstant> pfcs) {
+void Core::createCommands(std::vector<mesh::Mesh> allMeshData, LightObject light, std::vector<PushFragConstant> pfcs) {
     //needs to create command buffers
-    engGraphics.createCommandBuffers(gpuMemory.buffer, indexMemory.buffer, allIndices, allVertices, light, pfcs);
+    engGraphics.createCommandBuffers(gpuMemory.buffer, indexMemory.buffer, allMeshData, light, pfcs);
 }
 
 /// - PURPOSE - 
@@ -202,12 +202,12 @@ void Core::writeToDeviceBuffer(VkDeviceSize dataSize, mem::MaMemory* pMemory, vo
 //PARAMETERS - [VkDeviceSize] dataSize - the size of the data being written to vertex buffer
 //           - [void*] data - the data being written to vertex buffer
 //RETURNS - NONE
-void Core::writeToVertexBuffer(VkDeviceSize dataSize, void* data) {
-    writeToDeviceBuffer(dataSize, &gpuMemory, data);
+void Core::writeToVertexBuffer(std::vector<data::Vertex> vertices) {
+    writeToDeviceBuffer(sizeof(vertices[0]) * vertices.size(), &gpuMemory, vertices.data());
 }
 
-void Core::writeToIndexBuffer(VkDeviceSize dataSize, void* data) {
-    writeToDeviceBuffer(dataSize, &indexMemory, data);
+void Core::writeToIndexBuffer(std::vector<uint32_t> indices) {
+    writeToDeviceBuffer(sizeof(indices[0]) * indices.size(), &indexMemory, indices.data());
 }
 
 //PURPOSE - create and allocate memory for a small cpu-readable buffer

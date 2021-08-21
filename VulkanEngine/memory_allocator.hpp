@@ -65,6 +65,8 @@ struct MaMemoryData {
     VkDeviceSize resourceSize;
     size_t offsetIndex;
 };
+
+void maCreateObject();
 void maCreateBuffer(VkPhysicalDevice physicalDevice, VkDevice device, MaBufferCreateInfo* pCreateInfo, MaMemory* memory);
 void maCreateImage();
 void maMapMemory(VkDevice device, VkDeviceSize dataSize, MaMemory* pMemory, void* data);

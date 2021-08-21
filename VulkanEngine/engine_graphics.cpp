@@ -29,7 +29,7 @@ void EngineGraphics::recreateSwapChain() {
     createRenderPass(); //
     //createGraphicsPipeline(); //
     createFrameBuffers(); //
-    createCommandBuffers(vertexBuffer, indexBuffer, recentIndices, recentVertices, recentLightObject, recentPushConstants); //
+    createCommandBuffers(vertexBuffer, indexBuffer, recentMeshData, recentLightObject, recentPushConstants); //
 }
 
 void EngineGraphics::cleanupSwapChain(bool destroyAll) {
@@ -857,12 +857,11 @@ void EngineGraphics::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDevice
     vkFreeCommandBuffers(engineInit->device, engineInit->commandPool, 1, &transferBuffer);
 }
 
-void EngineGraphics::createCommandBuffers(VkBuffer buffer, VkBuffer indBuffer, std::vector<std::vector<uint16_t>> allIndices, std::vector<std::vector<data::Vertex>> allVertices, LightObject light, 
+void EngineGraphics::createCommandBuffers(VkBuffer buffer, VkBuffer indBuffer, std::vector<mesh::Mesh> allMeshData, LightObject light, 
     std::vector<PushFragConstant> pfcs) {
     vertexBuffer = buffer;
     indexBuffer = indBuffer;
-    recentIndices = allIndices;
-    recentVertices = allVertices;
+    recentMeshData = allMeshData;
     recentLightObject = light;
     recentPushConstants = pfcs;
 
@@ -885,12 +884,12 @@ void EngineGraphics::createCommandBuffers(VkBuffer buffer, VkBuffer indBuffer, s
     //TODO: multithread this process
 
     for (size_t i = 0; i < commandBuffers.size(); i++) {
-        createCommandBuffer(commandBuffers[i], swapChainFramebuffers[i], descriptorSets[i], buffer, indBuffer, allIndices, allVertices, light, pfcs);
+        createCommandBuffer(commandBuffers[i], swapChainFramebuffers[i], descriptorSets[i], buffer, indBuffer, allMeshData, light, pfcs);
     }
 }
 
 void EngineGraphics::createCommandBuffer(VkCommandBuffer commandBuffer, VkFramebuffer framebuffer, std::vector<VkDescriptorSet> descriptorSet, VkBuffer vertexBuffer, VkBuffer indexBuffer, 
-    std::vector<std::vector<uint16_t>> allIndices, std::vector<std::vector<data::Vertex>> allVertices, LightObject light, std::vector<PushFragConstant> pfcs) {
+    std::vector<mesh::Mesh> allMeshData, LightObject light, std::vector<PushFragConstant> pfcs) {
 
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -945,7 +944,7 @@ void EngineGraphics::createCommandBuffer(VkCommandBuffer commandBuffer, VkFrameb
     //time for the draw calls
     const VkDeviceSize offsets[] = { 0, offsetof(data::Vertex, normal)};
     vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer, offsets);
-    vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT16);
+    vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
     //draw first object (cube)
     uint32_t totalIndexes = 0;
@@ -953,9 +952,9 @@ void EngineGraphics::createCommandBuffer(VkCommandBuffer commandBuffer, VkFrameb
     
     //universal to every object so i can push the light constants before the for loop
     vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(light), &light);
-    for (size_t i = 0; i < allIndices.size(); i++) {
-        uint32_t indexCount = static_cast<uint32_t>(allIndices[i].size());
-        uint32_t vertexCount = static_cast<uint32_t>(allVertices[i].size());
+    for (size_t i = 0; i < allMeshData.size(); i++) {
+        uint32_t indexCount = static_cast<uint32_t>(allMeshData[i].getIndexData().size());
+        uint32_t vertexCount = static_cast<uint32_t>(allMeshData[i].getVertexData().size());
         vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(light), sizeof(pfcs[i]), &pfcs[i]);
         vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet[i], 0, nullptr);
         vkCmdDrawIndexed(commandBuffer, indexCount, 1, totalIndexes, totalVertices, (uint32_t)0);

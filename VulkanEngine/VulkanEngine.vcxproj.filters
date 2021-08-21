@@ -48,6 +48,15 @@
     <ClCompile Include="engine.cpp">
       <Filter>Resource Files</Filter>
     </ClCompile>
+    <ClCompile Include="model.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
+    <ClCompile Include="mesh.hpp">
+      <Filter>Header Files</Filter>
+    </ClCompile>
+    <ClCompile Include="mesh.cpp">
+      <Filter>Resource Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="camera.hpp">

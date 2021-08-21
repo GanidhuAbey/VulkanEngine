@@ -16,10 +16,11 @@ void main() {
     //get vector of light
     vec3 lightToObject = normalize(pfc.lightPosition - vec3(vPos));
 
-    float lightIntensity = dot(lightToObject, surfaceNormal);
-    float mapIntensity = (lightIntensity/2) + 0.5;
+    float lightIntensity = max(0.01f, dot(lightToObject, surfaceNormal));
+    //float mapIntensity = (lightIntensity/2) + 0.5;
 
-    vec3 newColor = mapIntensity * pfc.lightColor;
+    vec3 newColor = lightIntensity * pfc.lightColor;
+
 
     outColor = vec4(newColor * pfc.objectColor, 1.0);
 }
