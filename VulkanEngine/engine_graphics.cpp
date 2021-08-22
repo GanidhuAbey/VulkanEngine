@@ -29,7 +29,7 @@ void EngineGraphics::recreateSwapChain() {
     createRenderPass(); //
     //createGraphicsPipeline(); //
     createFrameBuffers(); //
-    createCommandBuffers(vertexBuffer, indexBuffer, recentMeshData, recentLightObject, recentPushConstants); //
+    createCommandBuffers(vertexBuffer, indexBuffer, recentModelData, recentLightObject, recentPushConstants); //
 }
 
 void EngineGraphics::cleanupSwapChain(bool destroyAll) {
@@ -857,13 +857,15 @@ void EngineGraphics::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDevice
     vkFreeCommandBuffers(engineInit->device, engineInit->commandPool, 1, &transferBuffer);
 }
 
-void EngineGraphics::createCommandBuffers(VkBuffer buffer, VkBuffer indBuffer, std::vector<mesh::Mesh> allMeshData, LightObject light, 
+void EngineGraphics::createCommandBuffers(VkBuffer buffer, VkBuffer indBuffer, std::vector<model::Model> allModels, LightObject light,
     std::vector<PushFragConstant> pfcs) {
     vertexBuffer = buffer;
     indexBuffer = indBuffer;
-    recentMeshData = allMeshData;
+    recentModelData = allModels;
     recentLightObject = light;
     recentPushConstants = pfcs;
+
+    printf("the size of all models is : %u \n", allModels.size());
 
     //allocate memory for command buffer, you have to create a draw command for each image
     commandBuffers.resize(swapChainFramebuffers.size());
@@ -884,12 +886,12 @@ void EngineGraphics::createCommandBuffers(VkBuffer buffer, VkBuffer indBuffer, s
     //TODO: multithread this process
 
     for (size_t i = 0; i < commandBuffers.size(); i++) {
-        createCommandBuffer(commandBuffers[i], swapChainFramebuffers[i], descriptorSets[i], buffer, indBuffer, allMeshData, light, pfcs);
+        createCommandBuffer(commandBuffers[i], swapChainFramebuffers[i], descriptorSets[i], buffer, indBuffer, allModels , light, pfcs);
     }
 }
 
 void EngineGraphics::createCommandBuffer(VkCommandBuffer commandBuffer, VkFramebuffer framebuffer, std::vector<VkDescriptorSet> descriptorSet, VkBuffer vertexBuffer, VkBuffer indexBuffer, 
-    std::vector<mesh::Mesh> allMeshData, LightObject light, std::vector<PushFragConstant> pfcs) {
+    std::vector<model::Model> allModels, LightObject light, std::vector<PushFragConstant> pfcs) {
 
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -952,15 +954,18 @@ void EngineGraphics::createCommandBuffer(VkCommandBuffer commandBuffer, VkFrameb
     
     //universal to every object so i can push the light constants before the for loop
     vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(light), &light);
-    for (size_t i = 0; i < allMeshData.size(); i++) {
-        uint32_t indexCount = static_cast<uint32_t>(allMeshData[i].getIndexData().size());
-        uint32_t vertexCount = static_cast<uint32_t>(allMeshData[i].getVertexData().size());
-        vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(light), sizeof(pfcs[i]), &pfcs[i]);
-        vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet[i], 0, nullptr);
-        vkCmdDrawIndexed(commandBuffer, indexCount, 1, totalIndexes, totalVertices, (uint32_t)0);
+    for (size_t i = 0; i < allModels.size(); i++) {
+        for (auto currentMesh : allModels[i].modelMeshes) {
+            uint32_t indexCount = static_cast<uint32_t>(currentMesh.getIndexData().size());
+            uint32_t vertexCount = static_cast<uint32_t>(currentMesh.getVertexData().size());
 
-        totalIndexes += indexCount;
-        totalVertices += vertexCount;
+            vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(light), sizeof(pfcs[i]), &pfcs[i]);
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet[i], 0, nullptr);
+            vkCmdDrawIndexed(commandBuffer, indexCount, 1, totalIndexes, totalVertices, (uint32_t)0);
+
+            totalIndexes += indexCount;
+            totalVertices += vertexCount;
+        }
     }
     //vkCmdDrawIndexed(commandBuffers[i], static_cast<uint32_t>(6), 1, 36, 0, 0);
     //vkCmdNextSubpass(commandBuffers[i], VK_SUBPASS_CONTENTS_INLINE);

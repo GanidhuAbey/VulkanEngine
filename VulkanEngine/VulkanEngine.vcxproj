@@ -45,6 +45,7 @@
     <ClInclude Include="eng_window.hpp" />
     <ClInclude Include="error_setup.hpp" />
     <ClInclude Include="memory_allocator.hpp" />
+    <ClInclude Include="model.hpp" />
     <ClInclude Include="queue.hpp" />
     <ClInclude Include="swapchain_support.hpp" />
   </ItemGroup>

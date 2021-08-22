@@ -3,7 +3,7 @@
 #include "eng_window.hpp"
 #include "engine_graphics.hpp"
 #include "memory_allocator.hpp"
-#include "mesh.hpp"
+#include "model.hpp"
 
 #include "data_formats.hpp"
 
@@ -63,8 +63,8 @@ class Core {
         bool hasUniformBuffer(size_t objIndex);
         void attachData(UniformBufferObject ubo);
         void updateData(UniformBufferObject ubo, size_t objIndex);
-        void createCommands(std::vector<mesh::Mesh> allMeshData, LightObject light, std::vector<PushFragConstant> pfcs);
-
+        void createCommands(std::vector<model::Model> allModels, LightObject light, std::vector<PushFragConstant> pfcs);
+        void updateBuffers(model::Model model);
 
     private:
         void createVertexBuffer(mem::MaMemory* pMemory);

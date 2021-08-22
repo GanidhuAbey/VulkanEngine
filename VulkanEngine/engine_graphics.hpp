@@ -7,7 +7,7 @@
 #include "queue.hpp"
 #include "data_formats.hpp"
 #include "memory_allocator.hpp"
-#include "mesh.hpp"
+#include "model.hpp"
 
 #include "engine_init.hpp"
 
@@ -77,7 +77,7 @@ class EngineGraphics {
         //energy
         std::vector<VkFence> imagesInFlight;
 
-        std::vector<mesh::Mesh> recentMeshData;
+        std::vector<model::Model> recentModelData;
         LightObject recentLightObject;
         std::vector<PushFragConstant> recentPushConstants;
 
@@ -94,7 +94,7 @@ class EngineGraphics {
         void createImageMemory(VkImage image);
         void createImageView(VkFormat format, VkImageUsageFlags usage, VkImage image, VkImageAspectFlags aspectFlags, VkImageView* imageView);
         void createCommandBuffer(VkCommandBuffer commandBuffer, VkFramebuffer framebuffer, std::vector<VkDescriptorSet> descriptorSet, VkBuffer vertexBuffer, VkBuffer indexBuffer, 
-            std::vector<mesh::Mesh> allMeshData, LightObject light, std::vector<PushFragConstant> pfcs);
+            std::vector<model::Model> allModels, LightObject light, std::vector<PushFragConstant> pfcs);
 
     public:
         //EngineGraphics(EngineInit* initEngine);
@@ -113,7 +113,7 @@ class EngineGraphics {
         void createFences();
 
     public:
-        void createCommandBuffers(VkBuffer buffer, VkBuffer indBuffer,  std::vector<mesh::Mesh> allMeshData, LightObject light, std::vector<PushFragConstant> pfcs);
+        void createCommandBuffers(VkBuffer buffer, VkBuffer indBuffer,  std::vector<model::Model> allModels, LightObject light, std::vector<PushFragConstant> pfcs);
         void drawFrame();
         void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize dstOffset, VkDeviceSize size);
         void updateDescriptorSet(VkDescriptorSet decriptorSet, VkDeviceSize bufferSize, VkBuffer buffer);

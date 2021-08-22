@@ -29,23 +29,20 @@ void Engine::render() {
 		//each object has its vertex, index, and uniform data but its not know whether this data is already attached or not
 		if (!engineCore.hasUniformBuffer(i)) {
 			//create vertex and index data
-			mesh::Mesh currentMesh = objectData[i]->objectMesh;
+			model::Model currentModel = objectData[i]->objectModel;
             PushFragConstant pfc = objectData[i]->pfc;
 
             allFragConstants.push_back(pfc);
+			allModels.push_back(currentModel);
 
-			allMeshData.push_back(currentMesh);
+			printf("the size of all models is : %u \n", allModels.size());
 
-			std::vector<data::Vertex> verts = currentMesh.getVertexData();
-			std::vector<uint32_t> indexes = currentMesh.getIndexData();
-
-			engineCore.writeToVertexBuffer(verts);
-			engineCore.writeToIndexBuffer(indexes);
+			engineCore.updateBuffers(currentModel);
 
 			//create uniform buffers to attach data to
 			engineCore.attachData(ubo);
 
-            engineCore.createCommands(allMeshData, light.light, allFragConstants);
+            engineCore.createCommands(allModels, light.light, allFragConstants);
 
             
 		}
@@ -148,7 +145,7 @@ void UserObject::scale(float x, float y, float z) {
 
 void UserObject::addMesh(const std::string& fileName, Color c) {
     //just going to use the assimp library for this
-	objectMesh.addMesh(fileName);	
+	objectModel.createModel(fileName);
 	
 	//now we have both vertices and indices
 	pfc.color = glm::vec4(c.red, c.green, c.blue, 0.0);

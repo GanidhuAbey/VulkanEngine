@@ -1,7 +1,7 @@
 #pragma once
 
 #include "core.hpp"
-#include "mesh.hpp"
+#include "model.hpp"
 
 #include <vector>
 #include <glm/glm.hpp>
@@ -40,7 +40,7 @@ private:
 public:
 	glm::mat4 transform;
 
-	mesh::Mesh objectMesh;
+	model::Model objectModel;
 	
 	PushFragConstant pfc;
 
@@ -72,11 +72,8 @@ public:
 class Engine {
 private:
 	std::vector<UserObject*> objectData;
-	std::vector<std::vector<data::Vertex>> allObjectVertices;
-	std::vector<std::vector<uint32_t>> allObjectIndices;
 	std::vector<PushFragConstant> allFragConstants;
-
-	std::vector<mesh::Mesh> allMeshData;
+	std::vector<model::Model> allModels;
 
 	UserCamera* mainCamera;
 	core::Core engineCore;

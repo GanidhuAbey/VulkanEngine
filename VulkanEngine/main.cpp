@@ -35,7 +35,6 @@ int main() {
     //add some mesh data to this object
     auto t1 = std::chrono::high_resolution_clock::now();
     someObject->addMesh("objects/test_object/car.obj", create::Color(0.1, 0.2, 0.6));
-
     
     auto t2 = std::chrono::high_resolution_clock::now();
     std::chrono::duration<double, std::milli> ms_double = t2 - t1;

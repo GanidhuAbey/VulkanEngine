@@ -79,9 +79,24 @@ void Core::updateData(UniformBufferObject ubo, size_t objIndex) {
     writeToLocalBuffer(sizeof(ubo), &engGraphics.uniformBufferData[objIndex], &ubo);
 }
 
-void Core::createCommands(std::vector<mesh::Mesh> allMeshData, LightObject light, std::vector<PushFragConstant> pfcs) {
+void Core::createCommands(std::vector<model::Model> allModels, LightObject light, std::vector<PushFragConstant> pfcs) {
     //needs to create command buffers
-    engGraphics.createCommandBuffers(gpuMemory.buffer, indexMemory.buffer, allMeshData, light, pfcs);
+    printf("the size of all models is : %u \n", allModels.size());
+    engGraphics.createCommandBuffers(gpuMemory.buffer, indexMemory.buffer, allModels, light, pfcs);
+}
+
+
+void Core::updateBuffers(model::Model model) {
+    std::vector<mesh::Mesh> modelMeshes = model.modelMeshes;
+    for (auto& currentMesh : modelMeshes) {
+        std::vector<data::Vertex> verts = currentMesh.getVertexData();
+        std::vector<uint32_t> indexes = currentMesh.getIndexData();
+
+        printf("size of verts: %u | size of indices: %u", verts.size(), indexes.size());
+
+        writeToVertexBuffer(verts);
+        writeToIndexBuffer(indexes);
+    }
 }
 
 /// - PURPOSE - 

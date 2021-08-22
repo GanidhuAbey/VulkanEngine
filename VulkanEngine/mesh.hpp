@@ -16,14 +16,14 @@ private:
 
 public:
 	//take the vertex data and load it into a buffer
-	Mesh();
+	Mesh(std::vector<data::Vertex> newVertices, std::vector<uint32_t> newIndices);
 	~Mesh();
 	void addMesh(const std::string& fileName);
 
 private:
 	std::vector<data::Vertex> accessDataVert(aiNode* node, aiMesh** const meshes, std::vector<data::Vertex> vertices);
 	std::vector<uint32_t> accessDataIndex(aiNode* node, aiMesh** const meshes, std::vector<uint32_t> indices, uint32_t* meshOffset);
-
+	std::vector<std::vector<glm::vec4>> accessDataTextures(aiNode* node, aiMesh** const meshes, std::vector<std::vector<glm::vec4>> textures);
 	data::Vertex createVertexFromAssimp(aiMesh* mesh, unsigned int index);
 
 public:

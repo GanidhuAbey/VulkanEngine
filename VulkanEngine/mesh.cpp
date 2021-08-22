@@ -5,17 +5,12 @@
 using namespace mesh;
 
 
-Mesh::Mesh() {
-	//create an empty mesh
-	data::Vertex vertex = {
-		glm::vec4(0.0, 0.0, 0.0, 0.0),
-		glm::vec4(0.0, 0.0, 0.0, 0.0),
-	};
-	vertices.push_back(vertex);
+Mesh::Mesh(std::vector<data::Vertex> newVertices, std::vector<uint32_t> newIndices) {
+	vertices.resize(newVertices.size());
+	vertices = newVertices;
 
-	indices.push_back(0);
-	indices.push_back(0);
-	indices.push_back(0);
+	newIndices.resize(newIndices.size());
+	indices = newIndices;
 }
 
 Mesh::~Mesh() {}
@@ -37,6 +32,7 @@ void Mesh::addMesh(const std::string& fileName) {
 	std::vector<data::Vertex> newVertices = accessDataVert(rootNode, sceneMeshes, newVertices);
 	uint32_t vertexOffset = 0;
 	std::vector<uint32_t> newIndices = accessDataIndex(rootNode, sceneMeshes, newIndices, &vertexOffset);
+	
 
 	vertices.resize(newVertices.size());
 	vertices = newVertices;
@@ -63,6 +59,7 @@ data::Vertex Mesh::createVertexFromAssimp(aiMesh* mesh, unsigned int index) {
 	return vertex;
 }
 
+//read data from assimp into two dimensional array, pass two dimensional array into VkImage, pass VkImage into fragment shader
 std::vector<data::Vertex> Mesh::accessDataVert(aiNode* node, aiMesh** const meshes, std::vector<data::Vertex> vertices) {
 	unsigned int meshCount = node->mNumMeshes;
 
