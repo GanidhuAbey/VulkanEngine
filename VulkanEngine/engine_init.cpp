@@ -282,10 +282,10 @@ void EngineInit::createInstance()
 
     appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     appInfo.pApplicationName = "Hello Triangle";
-    appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
+    appInfo.applicationVersion = VK_MAKE_VERSION(1, 2, 0);
     appInfo.pEngineName = "No Engine";
 
-    appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
+    appInfo.engineVersion = VK_MAKE_VERSION(1, 2, 0);
 
     //this will create a vulkan 1.0 version which is used in the tutorial.
     //TODO: try a higher version of vulkan to see how the program changes
@@ -315,11 +315,14 @@ void EngineInit::createInstance()
     //setup debug layers and extensions for instance#define VK_USE_PLATFORM_WIN32_KHR
     if (enableValidationLayers)
     {
+        printf("the debug layers should be enabled ... \n");
         //convert size int to uint32_t
         createInfo.enabledLayerCount = static_cast<uint32_t>(validationLayers.size());
         createInfo.ppEnabledLayerNames = validationLayers.data();
 
+        printf("message type: %u \n", createDebugInfo.messageType);
         populateDebugMessengerCreateInfo(createDebugInfo);
+        printf("message type again: %u \n", createDebugInfo.messageType);
         //do you need to do this?
         //TODO: see how removing this cast changes things once we draw triangle
         createInfo.pNext = (VkDebugUtilsMessengerCreateInfoEXT *)&createDebugInfo;
@@ -327,6 +330,7 @@ void EngineInit::createInstance()
     //don't need to do this but it will probably be useful to be as descriptive as possible
     else
     {
+        printf("I WILL WRITE THIS PART IN CAPS LOCK \n");
         createInfo.enabledLayerCount = 0;
         createInfo.pNext = nullptr;
     }

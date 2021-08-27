@@ -68,8 +68,82 @@ void mem::maCreateBuffer(VkPhysicalDevice physicalDevice, VkDevice device, MaBuf
     pMemory->locations.push_back(freeSpace);
 }
 //PURPOSE - create a image and allocate it with the memory required by the user
-void mem::maCreateImage()  {}
+void mem::maCreateImage(VkPhysicalDevice physicalDevice, VkDevice device, MaImageCreateInfo* imageInfo, MaMemory* pMemory)  {
+    //create image 
+    VkImageCreateInfo createInfo{};
+    createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+    createInfo.pNext = nullptr;
+    createInfo.flags = imageInfo->flags;
+    createInfo.imageType = imageInfo->imageType;
+    createInfo.format = imageInfo->format;
+    createInfo.extent = imageInfo->extent;
+    createInfo.mipLevels = imageInfo->mipLevels;
+    createInfo.arrayLayers = imageInfo->arrayLayers;
+    createInfo.samples = imageInfo->samples;
+    createInfo.tiling = imageInfo->tiling;
+    createInfo.usage = imageInfo->usage;
+    createInfo.sharingMode = imageInfo->sharingMode;
+    createInfo.queueFamilyIndexCount = imageInfo->queueFamilyIndexCount;
+    createInfo.pQueueFamilyIndices = imageInfo->pQueueFamilyIndices;
+    createInfo.initialLayout = imageInfo->initialLayout;
+    
+    if (vkCreateImage(device, &createInfo, nullptr, &pMemory->image) != VK_SUCCESS) {
+        throw std::runtime_error("could not create image");
+    }
 
+    //allocate memory
+    VkMemoryRequirements memoryReq{};
+    vkGetImageMemoryRequirements(device, pMemory->image, &memoryReq);
+
+    //create some memory for the image
+    VkMemoryAllocateInfo memoryAlloc{};
+    memoryAlloc.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO;
+    memoryAlloc.allocationSize = memoryReq.size;
+
+    VkPhysicalDeviceMemoryProperties memoryProperties;
+    vkGetPhysicalDeviceMemoryProperties(physicalDevice, &memoryProperties);
+
+    VkMemoryPropertyFlags properties = imageInfo->memoryProperties;
+
+    uint32_t memoryIndex = 0;
+    //uint32_t suitableMemoryForBuffer = 0;
+    for (uint32_t i = 0; i < memoryProperties.memoryTypeCount; i++) {
+        if (memoryReq.memoryTypeBits & (1 << i) && ((memoryProperties.memoryTypes[i].propertyFlags & properties) == properties)) {
+            memoryIndex = i;
+            break;
+        }
+    }
+
+    memoryAlloc.memoryTypeIndex = findMemoryType(physicalDevice, memoryReq.memoryTypeBits, imageInfo->memoryProperties);
+
+
+    VkResult allocResult = vkAllocateMemory(device, &memoryAlloc, nullptr, &pMemory->memoryHandle);
+
+    if (allocResult != VK_SUCCESS) {
+        throw std::runtime_error("could not allocate memory for memory pool");
+    }
+
+    if (vkBindImageMemory(device, pMemory->image, pMemory->memoryHandle, 0) != VK_SUCCESS) {
+        throw std::runtime_error("could not bind memory to image");
+    }
+
+}
+
+void mem::createImageView(VkDevice device, ImageViewCreateInfo viewInfo, MaMemory* pMemory) {
+    VkImageViewCreateInfo createInfo{};
+    createInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+    createInfo.pNext = viewInfo.pNext;
+    createInfo.flags = viewInfo.flags;
+    createInfo.image = pMemory->image;
+    createInfo.viewType = viewInfo.viewType;
+    createInfo.format = viewInfo.format;
+    createInfo.components = viewInfo.components;
+    createInfo.subresourceRange = viewInfo.subresourceRange;
+
+    if (vkCreateImageView(device, &createInfo, nullptr, &pMemory->imageView) != VK_SUCCESS) {
+        throw std::runtime_error("could not create image view");
+    }
+}
 
 //PURPOSE - given a memory block preserve a chunk of memory to be 'allocated' so that it can be filled with data without causing
 //          conflicts
@@ -147,11 +221,21 @@ void mem::maMapMemory(VkDevice device, VkDeviceSize dataSize, MaMemory* pMemory,
     vkUnmapMemory(device, pMemory->memoryHandle);
 }
 
-void mem::maDestroyMemory(VkDevice device, MaMemory maMemory) {
+void mem::destroyBuffer(VkDevice device, MaMemory maMemory) {
     vkDeviceWaitIdle(device);
     //free the large chunk of memory
     vkFreeMemory(device, maMemory.memoryHandle, nullptr);
 
     //destroy the associated buffer
     vkDestroyBuffer(device, maMemory.buffer, nullptr);
+}
+
+void mem::destroyImage(VkDevice device, MaMemory maMemory) {
+    vkDeviceWaitIdle(device);
+    //free the large chunk of memory
+    vkFreeMemory(device, maMemory.memoryHandle, nullptr);
+
+    //destroy the associated image
+    vkDestroyImageView(device, maMemory.imageView, nullptr);
+    vkDestroyImage(device, maMemory.image, nullptr);
 }

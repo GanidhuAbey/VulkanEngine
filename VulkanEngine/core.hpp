@@ -15,10 +15,6 @@ namespace core {
 
 class Core {
     private:
-
-        uint32_t queueG;
-        uint32_t queueP;
-
         GLFWwindow* glfWindow;
 
         uint32_t primitiveCount = 0;
@@ -27,6 +23,9 @@ class Core {
         glm::mat4 projectionMatrix;
 
     public:
+        uint32_t queueG;
+        uint32_t queueP;
+
         bool cameraInit = false;
 
         EngWindow userWindow;
@@ -63,8 +62,9 @@ class Core {
         bool hasUniformBuffer(size_t objIndex);
         void attachData(UniformBufferObject ubo);
         void updateData(UniformBufferObject ubo, size_t objIndex);
-        void createCommands(std::vector<model::Model> allModels, LightObject light, std::vector<PushFragConstant> pfcs);
-        void updateBuffers(model::Model model);
+        void createCommands(std::vector<model::Model*> allModels, LightObject light, std::vector<PushFragConstant> pfcs);
+        void updateBuffers(model::Model* model);
+        void attachTextureData(model::Model* modelData, size_t index);
 
     private:
         void createVertexBuffer(mem::MaMemory* pMemory);

@@ -5,15 +5,37 @@
 using namespace mesh;
 
 
-Mesh::Mesh(std::vector<data::Vertex> newVertices, std::vector<uint32_t> newIndices) {
+Mesh::Mesh(std::vector<data::Vertex> newVertices, std::vector<uint32_t> newIndices, std::vector<aiString> textureData) {
+	printf("texture size: %zu \n", textureData.size());
+
 	vertices.resize(newVertices.size());
 	vertices = newVertices;
 
-	newIndices.resize(newIndices.size());
+	indices.resize(newIndices.size());
 	indices = newIndices;
+
+	printf("the texture data size is : %s \n", textureData[0].data);
+	//load the texture data and save it into an image
+	//currently not sure about what to do when multiple textures are in play, most likely will have to blend them together before sending of to the shader
+	texturePaths.resize(textureData.size());
+	printf("hello \n");
+	texturePaths = textureData;
+	printf("hello2 \n");
+
+	printf("texture output: %s \n",  texturePaths[0]);
 }
 
 Mesh::~Mesh() {}
+
+void Mesh::addTexture(mem::MaMemory textureData) {
+	texture = textureData;
+}
+
+
+std::vector<std::vector<glm::vec3>> Mesh::loadTextureFromPath(char* texturePath) {
+	std::vector<std::vector<glm::vec3>> textureData;
+	return textureData;
+}
 
 void Mesh::addMesh(const std::string& fileName) {
 	Assimp::Importer importer;
@@ -40,12 +62,8 @@ void Mesh::addMesh(const std::string& fileName) {
 	indices.resize(newIndices.size());
 	indices = newIndices;
 
-	printf("----------------------------------------- \n");
-	for (size_t i = 0; i < indices.size(); i+=3) {
-		printf("< %u | %u | %u > \n", indices[i], indices[i + 1], indices[i + 2]);
-	}
-
 }
+
 
 data::Vertex Mesh::createVertexFromAssimp(aiMesh* mesh, unsigned int index) {
 	aiVector3D position = mesh->mVertices[index];
@@ -114,3 +132,26 @@ std::vector<data::Vertex> Mesh::getVertexData() {
 std::vector<uint32_t> Mesh::getIndexData() {
 	return indices;
 }
+
+std::vector<aiString> Mesh::getTexturePaths() {
+	//printf("the texture data over here is: %s \n", texturePaths[0]);
+	return texturePaths;
+}
+
+mem::MaMemory* Mesh::getTextureData() {
+	return &texture;
+}
+
+uint32_t Mesh::getTextureWidth() {
+	return textureWidth;
+}
+
+uint32_t Mesh::getTextureHeight() {
+	return textureHeight;
+}
+
+void Mesh::saveDimensions(uint32_t width, uint32_t height) {
+	textureWidth = width;
+	textureHeight = height;
+}
+

@@ -59,7 +59,12 @@ class EngineGraphics {
         uint32_t attributeCount = 2;
 
         VkDescriptorSetLayout setLayout;
+        VkDescriptorSetLayout textureLayout;
         VkPipelineLayout pipelineLayout;
+
+        std::vector<std::vector<VkDescriptorSet>> textureOutputSet;
+        VkDescriptorPool textureOutputPool;
+        VkSampler textureSampler;
 
         std::vector<VkFramebuffer> swapChainFramebuffers;
 
@@ -77,7 +82,7 @@ class EngineGraphics {
         //energy
         std::vector<VkFence> imagesInFlight;
 
-        std::vector<model::Model> recentModelData;
+        std::vector<model::Model*> recentModelData;
         LightObject recentLightObject;
         std::vector<PushFragConstant> recentPushConstants;
 
@@ -93,9 +98,14 @@ class EngineGraphics {
     	void createDepthImage();
         void createImageMemory(VkImage image);
         void createImageView(VkFormat format, VkImageUsageFlags usage, VkImage image, VkImageAspectFlags aspectFlags, VkImageView* imageView);
-        void createCommandBuffer(VkCommandBuffer commandBuffer, VkFramebuffer framebuffer, std::vector<VkDescriptorSet> descriptorSet, VkBuffer vertexBuffer, VkBuffer indexBuffer, 
-            std::vector<model::Model> allModels, LightObject light, std::vector<PushFragConstant> pfcs);
-
+        void createCommandBuffer(VkCommandBuffer commandBuffer, VkFramebuffer framebuffer, std::vector<VkDescriptorSet> descriptorSet, std::vector<VkDescriptorSet> textureSets, 
+            VkBuffer vertexBuffer, VkBuffer indexBuffer, std::vector<model::Model*> allModels, LightObject light, std::vector<PushFragConstant> pfcs);
+        void createTexturePool();
+        void createTextureSet();
+        void updateDescriptorSetTextures(VkDescriptorSet currentDescriptorSet, mem::MaMemory* pMemory);
+        void createTextureSampler();
+        void createDescriptorSets(uint32_t descriptorCount, VkDescriptorSetLayout setLayout, VkDescriptorPool descriptorPool, std::vector<VkDescriptorSet>* descriptorSets);
+        void createDescriptorPool(VkDescriptorType descriptorType, uint32_t descriptorCount, VkDescriptorPool* descriptorPool);
     public:
         //EngineGraphics(EngineInit* initEngine);
         void initialize(core::EngineInit* initEngine);
@@ -106,19 +116,24 @@ class EngineGraphics {
         void createDepthResources();
         void createColorImageViews();  //
         void createRenderPass(); //
-        void createDescriptorSetLayout();
+        void createDescriptorSetLayouts();
         void createGraphicsPipeline(); //
         void createFrameBuffers(); //
         void createSemaphores();
         void createFences();
 
     public:
-        void createCommandBuffers(VkBuffer buffer, VkBuffer indBuffer,  std::vector<model::Model> allModels, LightObject light, std::vector<PushFragConstant> pfcs);
+        void createCommandBuffers(VkBuffer buffer, VkBuffer indBuffer,  std::vector<model::Model*> allModels, LightObject light, std::vector<PushFragConstant> pfcs);
         void drawFrame();
         void copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize dstOffset, VkDeviceSize size);
-        void updateDescriptorSet(VkDescriptorSet decriptorSet, VkDeviceSize bufferSize, VkBuffer buffer);
-        void createDescriptorPools();
-        void createDescriptorSets(VkDeviceSize dataSize, VkBuffer buffer);
+        void updateUBOSets(VkDescriptorSet decriptorSet, VkDeviceSize bufferSize, VkBuffer buffer);
+        void createUBOPools();
+        void createUBOSets(VkDeviceSize dataSize, VkBuffer buffer);
+        void createTextureDescriptorData(model::Model* modelData, uint32_t index);
+        void copyImage(VkBuffer srcBuffer, VkImage dstImage, VkDeviceSize dstOffset, uint32_t image_width, uint32_t image_height);
+        VkCommandBuffer beginCommandBuffer();
+        void endCommandBuffer(VkCommandBuffer commandBuffer);
+        void transferImageLayout(VkImageLayout oldLayout, VkImageLayout newLayout, VkImage* image);
 };
 
 }

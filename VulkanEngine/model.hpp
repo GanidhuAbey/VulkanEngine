@@ -7,6 +7,10 @@ namespace model {
 class Model {
 public:
 	std::vector<mesh::Mesh> modelMeshes;
+
+	VkDescriptorPool texturePool;
+	std::vector<std::vector<VkDescriptorSet>> textureSets;
+
 public:
 	Model();
 	~Model();
@@ -18,8 +22,11 @@ private:
 	std::vector<std::vector<glm::vec4>> accessDataTextures(aiNode* node, aiMesh** const meshes, std::vector<std::vector<glm::vec4>> textures);
 	data::Vertex createVertexFromAssimp(aiMesh* mesh, unsigned int index);
 
-	void processScene(aiNode* node, aiMesh** const meshes);
-	mesh::Mesh processMesh(aiMesh* currentMesh);
+	void processScene(aiNode* node, aiMesh** const meshes, aiMaterial** materials);
+	mesh::Mesh processMesh(aiMesh* currentMesh, aiMaterial** materials);
+
+public:
+	void generateTextures(VkPhysicalDevice physicalDevice, VkDevice device, uint32_t queueFamilyIndexCount, uint32_t* pQueueFamilyIndices);
 };
 
 }

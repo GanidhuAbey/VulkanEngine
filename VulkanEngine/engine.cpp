@@ -4,6 +4,8 @@
 
 #include <string>
 
+#include <stb_image.h>
+
 using namespace create;
 
 /*---------------- Engine -----------------*/
@@ -29,18 +31,25 @@ void Engine::render() {
 		//each object has its vertex, index, and uniform data but its not know whether this data is already attached or not
 		if (!engineCore.hasUniformBuffer(i)) {
 			//create vertex and index data
-			model::Model currentModel = objectData[i]->objectModel;
+			model::Model* currentModel = &objectData[i]->objectModel;
             PushFragConstant pfc = objectData[i]->pfc;
+
+			//create texture(s) for model
+			//printf("texture test here: %s \n", currentModel.modelMeshes[0].getTexturePaths()[0]);
+			//currentModel.generateTextures(engineCore.engInit.physicalDevice, engineCore.engInit.device, 1, &engineCore.queueG);
+
+			printf("model: %zu", currentModel->modelMeshes.size());
 
             allFragConstants.push_back(pfc);
 			allModels.push_back(currentModel);
-
-			printf("the size of all models is : %u \n", allModels.size());
 
 			engineCore.updateBuffers(currentModel);
 
 			//create uniform buffers to attach data to
 			engineCore.attachData(ubo);
+			engineCore.attachTextureData(currentModel, i);
+
+			printf("the texture set size is: %zu \n", currentModel->textureSets.size());
 
             engineCore.createCommands(allModels, light.light, allFragConstants);
 
@@ -51,7 +60,17 @@ void Engine::render() {
     engineCore.draw();
 }
 
-Engine::~Engine() {}
+Engine::~Engine() {
+	//hopefully this works
+	for (size_t i = 0; i < allModels.size(); i++) {
+		//delete each pool
+		vkDestroyDescriptorPool(engineCore.engInit.device, allModels[i]->texturePool, nullptr);
+		for (size_t j = 0; j < allModels[i]->modelMeshes.size(); j++) {
+			//delete each texture here
+			mem::destroyImage(engineCore.engInit.device, *allModels[i]->modelMeshes[j].getTextureData());
+		}
+	}
+}
 
 /*---------------- Window Functionality -----------------*/
 void Engine::captureCursor() {
@@ -302,7 +321,7 @@ UserObject::~UserObject() {}
 /*------------------ Light Creation --------------------*/
 LightSource* Engine::createLight(glm::vec3 pos, Color lightColor) {
     UserObject* lightObject = createObject();
-    lightObject->addMesh("objects/test_object/test.obj", lightColor);
+    lightObject->addMesh("objects/test_object/with_texture.obj", lightColor);
     lightObject->translate(pos);
     lightObject->scale(0.1, 0.1, 0.1);
 

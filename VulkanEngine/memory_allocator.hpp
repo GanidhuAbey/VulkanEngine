@@ -51,6 +51,7 @@ struct MaFreeMemoryInfo {
 struct MaMemory {
     VkBuffer buffer;
     VkImage image;
+    VkImageView imageView;
     VkDeviceMemory memoryHandle;
     VkDeviceSize offset;
     size_t deleteIndex;
@@ -66,15 +67,45 @@ struct MaMemoryData {
     size_t offsetIndex;
 };
 
+struct MaImageCreateInfo {
+    VkImageCreateFlags flags = 0;
+    VkImageType imageType;
+    VkFormat format;
+    VkExtent3D extent;
+    uint32_t mipLevels;
+    uint32_t arrayLayers;
+    VkSampleCountFlagBits samples;
+    VkImageTiling tiling;
+    VkImageUsageFlags usage;
+    VkImageLayout initialLayout;
+    VkDeviceSize size;
+    VkSharingMode sharingMode;
+    uint32_t queueFamilyIndexCount;
+    const uint32_t* pQueueFamilyIndices;
+
+    VkMemoryPropertyFlags memoryProperties;
+};
+
+struct ImageViewCreateInfo {
+    void* pNext = nullptr;
+    VkImageViewCreateFlags flags = 0;
+    VkImageViewType viewType;
+    VkFormat format;
+    VkComponentMapping components;
+    VkImageSubresourceRange subresourceRange;
+};
+
 void maCreateObject();
 void maCreateBuffer(VkPhysicalDevice physicalDevice, VkDevice device, MaBufferCreateInfo* pCreateInfo, MaMemory* memory);
-void maCreateImage();
+void maCreateImage(VkPhysicalDevice physicalDevice, VkDevice device, MaImageCreateInfo* imageInfo, MaMemory* pMemory);
+void createImageView(VkDevice device, ImageViewCreateInfo viewInfo, MaMemory* pMemory);
 void maMapMemory(VkDevice device, VkDeviceSize dataSize, MaMemory* pMemory, void* data);
 uint32_t findMemoryType(VkPhysicalDevice physicalDevice, uint32_t typeFilter, VkMemoryPropertyFlags properties);
 
 void maCreateMemory(VkPhysicalDevice physicalDevice, VkDevice device, MaMemoryInfo* poolInfo, VkBuffer* buffer, MaMemory* maMemory);
 void maAllocateMemory(VkDeviceSize allocationSize, MaMemory* pMemory);
 void maFreeMemory(MaFreeMemoryInfo freeInfo, MaMemory* pMemory);
-void maDestroyMemory(VkDevice device, MaMemory maMemory);
+void destroyBuffer(VkDevice device, MaMemory maMemory);
+void destroyImage(VkDevice device, MaMemory maMemory);
 
 } // namespace mem

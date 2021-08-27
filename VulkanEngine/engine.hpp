@@ -73,7 +73,7 @@ class Engine {
 private:
 	std::vector<UserObject*> objectData;
 	std::vector<PushFragConstant> allFragConstants;
-	std::vector<model::Model> allModels;
+	std::vector<model::Model*> allModels;
 
 	UserCamera* mainCamera;
 	core::Core engineCore;

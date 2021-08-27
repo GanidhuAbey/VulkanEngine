@@ -3,6 +3,9 @@
 #include "core.hpp"
 #include "common.hpp"
 
+#define STB_IMAGE_IMPLEMENTATION
+#include "stb_image.h"
+
 using namespace core;
 
 //define some global variables.
@@ -38,9 +41,9 @@ void Core::init(int w, int h, const char* title) {
 }
 
 Core::~Core() {
-    mem::maDestroyMemory(engInit.device, gpuMemory);
-    mem::maDestroyMemory(engInit.device, indexMemory);
-    //mem::maDestroyMemory(engInit.device, uniformMemory, uniformBuffer);
+    mem::destroyBuffer(engInit.device, gpuMemory);
+    mem::destroyBuffer(engInit.device, indexMemory);
+    //mem::destroyBuffer(engInit.device, uniformMemory, uniformBuffer);
     //nothing to do now, maybe in the future we can add a check to see if memory is leaking
     std::cout << "program exectuted and closed" << std::endl;
 }
@@ -50,7 +53,7 @@ void Core::draw() {
 }
 
 void Core::destroyUniformData(size_t objIndex) {
-    mem::maDestroyMemory(engInit.device, engGraphics.uniformBufferData[objIndex]);
+    mem::destroyBuffer(engInit.device, engGraphics.uniformBufferData[objIndex]);
 }
 
 bool Core::hasUniformBuffer(size_t objIndex) {
@@ -65,8 +68,108 @@ void Core::attachData(UniformBufferObject ubo) {
     createUniformBuffer(sizeof(ubo), &uniformBufferMemory);
     engGraphics.uniformBufferData[objIndex] = uniformBufferMemory;
 
-    engGraphics.createDescriptorPools();
-    engGraphics.createDescriptorSets(sizeof(UniformBufferObject), engGraphics.uniformBufferData[objIndex].buffer);
+    engGraphics.createUBOPools();
+    printf("hello \n");
+    engGraphics.createUBOSets(sizeof(UniformBufferObject), engGraphics.uniformBufferData[objIndex].buffer);
+}
+
+void Core::attachTextureData(model::Model* modelData, size_t index) {
+    //generate images here
+    for (size_t i = 0; i < modelData->modelMeshes.size(); i++) {
+        printf("THE MODEL MESH SIZE IF : %zu", modelData->modelMeshes.size());
+        std::vector<aiString> meshTextures = modelData->modelMeshes[i].getTexturePaths();
+
+        //load image with path, will need different library
+        //TODO: when multiple textures are present a blending of some sort may be required before being sent to the shader
+        if (meshTextures.size() == 0) {
+            printf("why no pass throug here \n");
+            return;
+        }
+
+        //printf("the image path is: %s \n", meshTextures[0]);
+        int imageWidth, imageHeight, imageChannels;
+        stbi_uc *pixels = stbi_load(meshTextures[0].data, &imageWidth, &imageHeight, &imageChannels, STBI_rgb_alpha);
+
+        VkDeviceSize dataSize = 4 * (imageWidth * imageHeight);
+        mem::MaBufferCreateInfo textureBufferInfo{};
+        textureBufferInfo.size = dataSize;
+        textureBufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+        textureBufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        textureBufferInfo.memoryProperties = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+        textureBufferInfo.queueFamilyIndexCount = 1;
+        textureBufferInfo.pQueueFamilyIndices = &queueG;
+
+        printf("data size: %zu \n", dataSize);
+
+        mem::MaMemory newBuffer;
+        mem::maCreateBuffer(engInit.physicalDevice, engInit.device, &textureBufferInfo, &newBuffer);
+        mem::maAllocateMemory(dataSize, &newBuffer);
+        mem::maMapMemory(engInit.device, dataSize, &newBuffer, pixels);
+
+        printf("made it ? \n");
+
+        //use size of loaded image to create VkImage
+        mem::MaMemory newTextureImage;
+
+        mem::MaImageCreateInfo imageInfo{};
+        imageInfo.imageType = VK_IMAGE_TYPE_2D;
+        imageInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
+        VkExtent3D extent{};
+        extent.width = static_cast<uint32_t>(imageWidth);
+        extent.height = static_cast<uint32_t>(imageHeight);
+        extent.depth = 1; //this depth might be key to blending the textures...
+        imageInfo.extent = extent;
+        imageInfo.mipLevels = 1;
+        imageInfo.arrayLayers = 1;
+        imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+        imageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+        imageInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+        imageInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        imageInfo.queueFamilyIndexCount = 1;
+        imageInfo.pQueueFamilyIndices = &queueG;
+        imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+        imageInfo.memoryProperties = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+
+        mem::maCreateImage(engInit.physicalDevice, engInit.device, &imageInfo, &newTextureImage);
+
+        //mem::maAllocateMemory(dataSize, &newTextureImage);
+        //transfer the image to appropriate layout for copying
+        engGraphics.transferImageLayout(VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, &newTextureImage.image);
+        engGraphics.copyImage(newBuffer.buffer, newTextureImage.image, 0.0, imageWidth, imageHeight);
+        //transfer the image again to a more optimal layout for texture sampling?
+        engGraphics.transferImageLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, &newTextureImage.image);
+
+        //create image view for image
+        mem::ImageViewCreateInfo viewInfo{};
+        viewInfo.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        viewInfo.format = VK_FORMAT_R8G8B8A8_SRGB;
+        viewInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+        viewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+        viewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+        viewInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+        viewInfo.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        viewInfo.subresourceRange.baseMipLevel = 0;
+        viewInfo.subresourceRange.levelCount = 1;
+        viewInfo.subresourceRange.baseArrayLayer = 0;
+        viewInfo.subresourceRange.layerCount = 1;
+
+        mem::createImageView(engInit.device, viewInfo, &newTextureImage);
+
+        mem::destroyBuffer(engInit.device, newBuffer);
+
+        //save texture image to mesh
+        modelData->modelMeshes[i].addTexture(newTextureImage);
+
+        //save image data to texture
+        modelData->modelMeshes[i].saveDimensions(static_cast<uint32_t>(imageWidth), static_cast<uint32_t>(imageHeight));
+     
+        //free image
+        stbi_image_free(pixels);
+    }
+
+    /* Create Descriptor Data For Model */
+    engGraphics.createTextureDescriptorData(modelData, index);
 }
 
 void Core::updateData(UniformBufferObject ubo, size_t objIndex) {
@@ -79,15 +182,17 @@ void Core::updateData(UniformBufferObject ubo, size_t objIndex) {
     writeToLocalBuffer(sizeof(ubo), &engGraphics.uniformBufferData[objIndex], &ubo);
 }
 
-void Core::createCommands(std::vector<model::Model> allModels, LightObject light, std::vector<PushFragConstant> pfcs) {
+void Core::createCommands(std::vector<model::Model*> allModels, LightObject light, std::vector<PushFragConstant> pfcs) {
     //needs to create command buffers
     printf("the size of all models is : %u \n", allModels.size());
     engGraphics.createCommandBuffers(gpuMemory.buffer, indexMemory.buffer, allModels, light, pfcs);
 }
 
 
-void Core::updateBuffers(model::Model model) {
-    std::vector<mesh::Mesh> modelMeshes = model.modelMeshes;
+void Core::updateBuffers(model::Model* model) {
+    printf("right? \n");
+    std::vector<mesh::Mesh> modelMeshes = model->modelMeshes;
+    printf("going in \n");
     for (auto& currentMesh : modelMeshes) {
         std::vector<data::Vertex> verts = currentMesh.getVertexData();
         std::vector<uint32_t> indexes = currentMesh.getIndexData();
@@ -143,8 +248,8 @@ void Core::applyTransform(glm::mat4 transform, size_t objIndex, float camera_ang
     //the data is now written to memory in a uniform buffer
     //we just need a descriptor pool and set to describe the resource to the gpu
     if (objIndex + 1 > engGraphics.descriptorPools.size()) {
-        engGraphics.createDescriptorPools();
-        engGraphics.createDescriptorSets(sizeof(UniformBufferObject), engGraphics.uniformBufferData[objIndex].buffer);
+        engGraphics.createUBOPools();
+        engGraphics.createUBOSets(sizeof(UniformBufferObject), engGraphics.uniformBufferData[objIndex].buffer);
     }
 
     writeToLocalBuffer(sizeof(UniformBufferObject), &engGraphics.uniformBufferData[objIndex], &ubo);
@@ -210,7 +315,7 @@ void Core::writeToDeviceBuffer(VkDeviceSize dataSize, mem::MaMemory* pMemory, vo
     pMemory->allocate = false;
 
     //destroy buffer and its associated memory
-    mem::maDestroyMemory(engInit.device, tempMemory);
+    mem::destroyBuffer(engInit.device, tempMemory);
 }
 
 //PURPOSE - abstract a bit away from the underlying api when writing to the proper buffer

@@ -142,8 +142,12 @@ void EngineGraphics::initialize(core::EngineInit* initEngine) {
     createDepthResources();
     createColorImageViews(); //creates color images
     createRenderPass(); //
-    createDescriptorSetLayout();
+    createDescriptorSetLayouts();
     createGraphicsPipeline(); //
+    //createTexturePool();
+    printf("here \n");
+    //createTextureSet();
+    createTextureSampler();
     createFrameBuffers(); //
     createSemaphores();
     createFences();
@@ -158,9 +162,11 @@ EngineGraphics::~EngineGraphics() {
         vkDestroyDescriptorPool(engineInit->device, descriptorPools[i], nullptr);
     }
     for (size_t i = 0; i < uniformBufferData.size(); i++) {
-        mem::maDestroyMemory(engineInit->device, uniformBufferData[i]);
+        mem::destroyBuffer(engineInit->device, uniformBufferData[i]);
     }
+    vkDestroyDescriptorPool(engineInit->device, textureOutputPool, nullptr);
     vkDestroyDescriptorSetLayout(engineInit->device, setLayout,  nullptr);
+    //vkDestroyDescriptorSetLayout(engineInit->device, textureLayout, nullptr);
 
     //destroy depth data
     vkDestroyImageView(engineInit->device, depthImageView, nullptr);
@@ -171,6 +177,9 @@ EngineGraphics::~EngineGraphics() {
     //vkDestroyBuffer(engineInit->device, vertexBuffer, nullptr);
 
     //vkFreeCommandBuffers(engineInit->device, engineInit->commandPool, static_cast<uint32_t>(commandBuffers.size()), commandBuffers.data());
+
+    //destroy sampler
+    vkDestroySampler(engineInit->device, textureSampler, nullptr);
 
     for (const auto& framebuffer : swapChainFramebuffers) {
         vkDestroyFramebuffer(engineInit->device, framebuffer, nullptr);
@@ -238,8 +247,6 @@ void EngineGraphics::createSwapChain() {
     uint32_t queueIndices[] = {indices.graphicsFamily.value(), indices.presentFamily.value()};
 
     if (indices.graphicsFamily.value() != indices.presentFamily.value()) {
-
-
         createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
         createInfo.queueFamilyIndexCount = 2;
         createInfo.pQueueFamilyIndices = queueIndices;
@@ -497,7 +504,8 @@ void EngineGraphics::createRenderPass() {
     }
 }
 
-void EngineGraphics::createDescriptorSetLayout() {
+void EngineGraphics::createDescriptorSetLayouts() {
+    /* UNIFORM BUFFER DESCRIPTOR SET */
     VkDescriptorSetLayoutBinding uboLayoutBinding{};
     uboLayoutBinding.binding = 0;
     uboLayoutBinding.descriptorCount = 1;
@@ -505,17 +513,36 @@ void EngineGraphics::createDescriptorSetLayout() {
     uboLayoutBinding.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
     uboLayoutBinding.pImmutableSamplers = nullptr;
 
+    /* SAMPLED IMAGE DESCRIPTOR SET (FOR TEXTURING) */
+    VkDescriptorSetLayoutBinding textureLayoutBinding{};
+    textureLayoutBinding.binding = 0;
+    textureLayoutBinding.descriptorCount = 1;
+    textureLayoutBinding.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    textureLayoutBinding.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+    textureLayoutBinding.pImmutableSamplers = nullptr;
+
     VkDescriptorSetLayoutCreateInfo layoutInfo{};
     layoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
-    layoutInfo.bindingCount = 1;
-    layoutInfo.pBindings = &uboLayoutBinding;
+
+    std::array<VkDescriptorSetLayoutBinding, 1> bindings = {uboLayoutBinding};
+
+    layoutInfo.bindingCount = static_cast<uint32_t>(bindings.size());
+    layoutInfo.pBindings = bindings.data();
 
     if (vkCreateDescriptorSetLayout(engineInit->device, &layoutInfo, nullptr, &setLayout) != VK_SUCCESS) {
         throw std::runtime_error("could not create descriptor set");
     }
 
-    //update descriptor set size here
-    descriptorSets.resize(swapChainImages.size());
+    //try creating another set layout here...
+    VkDescriptorSetLayoutCreateInfo textureLayoutInfo{};
+    textureLayoutInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
+    textureLayoutInfo.bindingCount = 1;
+    textureLayoutInfo.pBindings = &textureLayoutBinding;
+
+    if (vkCreateDescriptorSetLayout(engineInit->device, &textureLayoutInfo, nullptr, &textureLayout) != VK_SUCCESS) {
+        throw std::runtime_error("could not create texure set layout");
+    }
+    printf("the texture layout has been created \n");
 }
 
 /// - PURPOSE -
@@ -525,7 +552,7 @@ void EngineGraphics::createDescriptorSetLayout() {
 /// [VkBuffer] buffer - the actual buffer
 /// - RETURNS - 
 /// [void]
-void EngineGraphics::updateDescriptorSet(VkDescriptorSet descriptorSet, VkDeviceSize bufferSize, VkBuffer buffer) {
+void EngineGraphics::updateUBOSets(VkDescriptorSet descriptorSet, VkDeviceSize bufferSize, VkBuffer buffer) {
     VkDescriptorBufferInfo bufferInfo{};
     bufferInfo.buffer = buffer;
     bufferInfo.offset = 0;
@@ -543,7 +570,8 @@ void EngineGraphics::updateDescriptorSet(VkDescriptorSet descriptorSet, VkDevice
     vkUpdateDescriptorSets(engineInit->device, 1, &writeInfo, 0, nullptr);
 }
 
-void EngineGraphics::createDescriptorPools() {
+void EngineGraphics::createUBOPools() {
+    /* UNIFORM BUFFER DESCRIPTOR POOLS*/
     VkDescriptorPoolSize poolSize{};
     poolSize.type = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
     poolSize.descriptorCount = static_cast<uint32_t>(swapChainImages.size());
@@ -561,9 +589,114 @@ void EngineGraphics::createDescriptorPools() {
         throw std::runtime_error("failed to create descriptor pool!");
     }
 }
+
+void EngineGraphics::createDescriptorPool(VkDescriptorType descriptorType, uint32_t descriptorCount, VkDescriptorPool* descriptorPool) {
+    VkDescriptorPoolSize poolSize{};
+    poolSize.type = descriptorType;
+    poolSize.descriptorCount = descriptorCount;
+
+    VkDescriptorPoolCreateInfo poolInfo{};
+    poolInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO;
+    poolInfo.poolSizeCount = 1;
+    poolInfo.pPoolSizes = &poolSize;
+    poolInfo.maxSets = descriptorCount;
+    //poolInfo.flags = 0;
+
+    if (vkCreateDescriptorPool(engineInit->device, &poolInfo, nullptr, descriptorPool) != VK_SUCCESS) {
+        throw std::runtime_error("failed to create descriptor pool!");
+    }
+}
+
+void EngineGraphics::createDescriptorSets(uint32_t descriptorCount, VkDescriptorSetLayout layout, VkDescriptorPool descriptorPool, std::vector<VkDescriptorSet>* descriptorSets) {
+    std::vector<VkDescriptorSetLayout> theSetLayouts(descriptorCount, layout);
+
+    printf("hellow again \n");
+
+    VkDescriptorSetAllocateInfo allocateInfo{};
+    allocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
+    allocateInfo.descriptorPool = descriptorPool;
+    allocateInfo.descriptorSetCount = descriptorCount;
+    allocateInfo.pSetLayouts = theSetLayouts.data();
+
+    //size_t currentSize = descriptorSets.size();
+    //descriptorSets.resize(currentSize + 1);
+    //descriptorSets[currentSize].resize(swapChainImages.size());
+
+    if (vkAllocateDescriptorSets(engineInit->device, &allocateInfo, descriptorSets->data()) != VK_SUCCESS) {
+        throw std::runtime_error("failed to allocate descriptor sets!");
+    }
+
+}
+
+void EngineGraphics::createTextureDescriptorData(model::Model* modelData, uint32_t index) {
+    /* UPDATE DESCRIPTOR SET DATA */
+    //create descriptor pool for texture
+    createDescriptorPool(VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, static_cast<uint32_t>(swapChainImages.size() * modelData->modelMeshes.size()), &modelData->texturePool);
+
+    //create descriptor set for texture
+    modelData->textureSets.resize(swapChainImages.size());
+    for (size_t i = 0; i < swapChainImages.size(); i++) {
+        //create a descriptor set for each mesh.
+        modelData->textureSets[i].resize(modelData->modelMeshes.size());
+        createDescriptorSets(static_cast<uint32_t>(modelData->modelMeshes.size()), textureLayout, modelData->texturePool, &modelData->textureSets[i]);
+        //update all that descriptor data
+        //update descriptor set data with texture/sampling data
+        for (size_t j = 0; j < modelData->modelMeshes.size(); j++) {
+            updateDescriptorSetTextures(modelData->textureSets[i][j], modelData->modelMeshes[j].getTextureData());
+        }
+    }
+
+
+}
+
+void EngineGraphics::createTextureSampler() {
+    /* Create Sampler */
+    VkSamplerCreateInfo samplerInfo{};
+    samplerInfo.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+    samplerInfo.pNext = nullptr;
+    samplerInfo.flags = 0;
+    samplerInfo.magFilter = VK_FILTER_NEAREST;
+    samplerInfo.minFilter = VK_FILTER_NEAREST;
+    samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_NEAREST;
+    samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+    samplerInfo.mipLodBias = 0.0f;
+    samplerInfo.anisotropyEnable = VK_FALSE;
+    samplerInfo.compareEnable = VK_FALSE;
+    samplerInfo.minLod = 0.0f;
+    samplerInfo.maxLod = VK_LOD_CLAMP_NONE;
+    samplerInfo.borderColor = VK_BORDER_COLOR_FLOAT_OPAQUE_BLACK;
+    samplerInfo.unnormalizedCoordinates = VK_FALSE;
+
+    if (vkCreateSampler(engineInit->device, &samplerInfo, nullptr, &textureSampler) != VK_SUCCESS) {
+        printf("[ERROR] - createTextureSampler() : failed to create sampler object");
+    }
+}
+
+void EngineGraphics::updateDescriptorSetTextures(VkDescriptorSet currentDescriptorSet, mem::MaMemory* pMemory) {
+    VkDescriptorImageInfo imageInfo;
+    imageInfo.sampler = textureSampler;
+    imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+    imageInfo.imageView = pMemory->imageView;
+
+    VkWriteDescriptorSet writeInfo{};
+    writeInfo.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+    writeInfo.dstBinding = 0;
+    writeInfo.dstSet = currentDescriptorSet;
+    writeInfo.descriptorCount = 1;
+    writeInfo.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+    writeInfo.pImageInfo = &imageInfo;
+    writeInfo.dstArrayElement = 0;
+
+    vkUpdateDescriptorSets(engineInit->device, 1, &writeInfo, 0, nullptr);
+}
+
 //TODO: this buffer parameter is useless
-void EngineGraphics::createDescriptorSets(VkDeviceSize bufferSize, VkBuffer buffer) {
+void EngineGraphics::createUBOSets(VkDeviceSize bufferSize, VkBuffer buffer) {
     std::vector<VkDescriptorSetLayout> layouts(swapChainImages.size(), setLayout);
+
+    printf("hellow again \n");
 
     VkDescriptorSetAllocateInfo allocateInfo{};
     allocateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO;
@@ -580,16 +713,17 @@ void EngineGraphics::createDescriptorSets(VkDeviceSize bufferSize, VkBuffer buff
         throw std::runtime_error("failed to allocate descriptor sets!");
     }
 
+    descriptorSets.resize(swapChainImages.size());
     size_t currentSize = descriptorSets[0].size();
     for (size_t i = 0; i < swapChainImages.size(); i++) {
         descriptorSets[i].resize(currentSize + 1);
         descriptorSets[i][currentSize] = currentDescriptorSet[i];
-        updateDescriptorSet(currentDescriptorSet[i], bufferSize, buffer);
+        updateUBOSets(currentDescriptorSet[i], bufferSize, buffer);
     }
 
 }
 
-void EngineGraphics::createGraphicsPipeline()  {
+void EngineGraphics::createGraphicsPipeline() {
     //load in the appropriate shader code for a triangle
     auto vertShaderCode = readFile("shaders/vert.spv");
     auto fragShaderCode = readFile("shaders/frag.spv");
@@ -602,7 +736,7 @@ void EngineGraphics::createGraphicsPipeline()  {
     VkPipelineShaderStageCreateInfo createVertShaderInfo = fillShaderStageStruct(VK_SHADER_STAGE_VERTEX_BIT, vertShader);
     VkPipelineShaderStageCreateInfo createFragShaderInfo = fillShaderStageStruct(VK_SHADER_STAGE_FRAGMENT_BIT, fragShader);
 
-    const VkPipelineShaderStageCreateInfo shaderStages[] = {createVertShaderInfo, createFragShaderInfo};
+    const VkPipelineShaderStageCreateInfo shaderStages[] = { createVertShaderInfo, createFragShaderInfo };
 
     VkPipelineVertexInputStateCreateInfo vertexInputInfo{};
     vertexInputInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO;
@@ -614,7 +748,7 @@ void EngineGraphics::createGraphicsPipeline()  {
     bindingDescrip.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
     vertexInputInfo.pVertexBindingDescriptions = &bindingDescrip;
 
-    vertexInputInfo.vertexAttributeDescriptionCount = 2;
+    vertexInputInfo.vertexAttributeDescriptionCount = 3;
 
     VkVertexInputAttributeDescription posAttribute{};
     posAttribute.location = 0;
@@ -636,7 +770,13 @@ void EngineGraphics::createGraphicsPipeline()  {
     normalAttribute.format = VK_FORMAT_R32G32B32_SFLOAT;
     normalAttribute.offset = offsetof(data::Vertex, normal);
 
-    VkVertexInputAttributeDescription attributeDescriptions[] = {posAttribute, normalAttribute};
+    VkVertexInputAttributeDescription texAttribute{};
+    texAttribute.location = 2;
+    texAttribute.binding = 0;
+    texAttribute.format = VK_FORMAT_R32G32_SFLOAT;
+    texAttribute.offset = offsetof(data::Vertex, texCoord);
+
+    VkVertexInputAttributeDescription attributeDescriptions[] = {posAttribute, normalAttribute, texAttribute};
 
     vertexInputInfo.pVertexAttributeDescriptions = attributeDescriptions;
 
@@ -732,8 +872,10 @@ void EngineGraphics::createGraphicsPipeline()  {
 
     VkPipelineLayoutCreateInfo pipelineLayoutInfo{};
     pipelineLayoutInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO;
-    pipelineLayoutInfo.setLayoutCount = 1;
-    pipelineLayoutInfo.pSetLayouts = &setLayout;
+    const uint32_t layoutCount = 2;
+    pipelineLayoutInfo.setLayoutCount = layoutCount;
+    VkDescriptorSetLayout layouts[layoutCount] = {setLayout, textureLayout};
+    pipelineLayoutInfo.pSetLayouts = layouts;
     pipelineLayoutInfo.pushConstantRangeCount = 1;
 
     VkPushConstantRange pushRange{};
@@ -803,6 +945,27 @@ void EngineGraphics::createFrameBuffers() {
 }
 //TODO: use seperate command pool for memory optimizations
 void EngineGraphics::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDeviceSize dstOffset, VkDeviceSize size) {
+    VkCommandBuffer transferBuffer = beginCommandBuffer();
+
+    //transfer between buffers
+    VkBufferCopy copyData{};
+    copyData.srcOffset = 0;
+    //TODO: need to allocate memory and choose a proper offset for this
+    copyData.dstOffset = dstOffset;
+    copyData.size = size;
+
+    vkCmdCopyBuffer(transferBuffer,
+        srcBuffer,
+        dstBuffer,
+        1,
+        &copyData
+    );
+
+    //destroy transfer buffer, shouldnt need it after copying the data.
+    endCommandBuffer(transferBuffer);
+}
+
+VkCommandBuffer EngineGraphics::beginCommandBuffer() {
     //create command buffer
     VkCommandBuffer transferBuffer;
 
@@ -826,22 +989,12 @@ void EngineGraphics::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDevice
         throw std::runtime_error("one of the command buffers failed to begin");
     }
 
-    //transfer between buffers
-    VkBufferCopy copyData{};
-    copyData.srcOffset = 0;
-    //TODO: need to allocate memory and choose a proper offset for this
-    copyData.dstOffset = dstOffset;
-    copyData.size = size;
+    return transferBuffer;
+}
 
-    vkCmdCopyBuffer(transferBuffer,
-        srcBuffer,
-        dstBuffer,
-        1,
-        &copyData
-    );
-
+void EngineGraphics::endCommandBuffer(VkCommandBuffer commandBuffer) {
     //end command buffer
-    if (vkEndCommandBuffer(transferBuffer) != VK_SUCCESS) {
+    if (vkEndCommandBuffer(commandBuffer) != VK_SUCCESS) {
         throw std::runtime_error("could not create succesfully end transfer buffer");
     };
 
@@ -849,23 +1002,115 @@ void EngineGraphics::copyBuffer(VkBuffer srcBuffer, VkBuffer dstBuffer, VkDevice
     VkSubmitInfo submitInfo{};
     submitInfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
     submitInfo.commandBufferCount = 1;
-    submitInfo.pCommandBuffers = &transferBuffer;
+    submitInfo.pCommandBuffers = &commandBuffer;
 
     vkQueueSubmit(engineInit->graphicsQueue, 1, &submitInfo, VK_NULL_HANDLE);
     vkQueueWaitIdle(engineInit->graphicsQueue);
 
-    vkFreeCommandBuffers(engineInit->device, engineInit->commandPool, 1, &transferBuffer);
+    vkFreeCommandBuffers(engineInit->device, engineInit->commandPool, 1, &commandBuffer);
 }
 
-void EngineGraphics::createCommandBuffers(VkBuffer buffer, VkBuffer indBuffer, std::vector<model::Model> allModels, LightObject light,
+void EngineGraphics::copyImage(VkBuffer srcBuffer, VkImage dstImage, VkDeviceSize dstOffset, uint32_t image_width, uint32_t image_height) {
+    //create command buffer
+    VkCommandBuffer transferBuffer = beginCommandBuffer();
+
+    VkImageSubresourceLayers imageSub{};
+    imageSub.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    imageSub.mipLevel = 0;
+    imageSub.baseArrayLayer = 0;
+    imageSub.layerCount = 1;
+
+    VkOffset3D imageOffset = {
+        0,
+        0,
+        0,
+    };
+
+    VkExtent3D imageExtent = {
+        image_width,
+        image_height,
+        1,
+    };
+
+    VkBufferImageCopy bufferCopy{};
+    bufferCopy.bufferOffset = 0;
+    bufferCopy.bufferRowLength = 0;
+    bufferCopy.bufferImageHeight = 0;
+    bufferCopy.imageSubresource = imageSub;
+    bufferCopy.imageOffset = imageOffset;
+    bufferCopy.imageExtent = imageExtent;
+
+    vkCmdCopyBufferToImage(transferBuffer,
+        srcBuffer,
+        dstImage,
+        VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+        1,
+        &bufferCopy
+    );
+
+    //destroy transfer buffer, shouldnt need it after copying the data.
+    endCommandBuffer(transferBuffer);
+}
+
+void EngineGraphics::transferImageLayout(VkImageLayout oldLayout, VkImageLayout newLayout, VkImage* image) {
+    //begin command buffer
+    VkCommandBuffer commandBuffer = beginCommandBuffer();
+
+
+    //transfer image layout
+    VkImageMemoryBarrier imageTransfer{};
+    imageTransfer.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER;
+    imageTransfer.pNext = nullptr;
+    imageTransfer.oldLayout = oldLayout;
+    imageTransfer.newLayout = newLayout;
+    imageTransfer.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    imageTransfer.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+    imageTransfer.image = *image;
+    imageTransfer.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+    imageTransfer.subresourceRange.baseMipLevel = 0;
+    imageTransfer.subresourceRange.levelCount = 1;
+    imageTransfer.subresourceRange.baseArrayLayer = 0;
+    imageTransfer.subresourceRange.layerCount = 1;
+
+    VkPipelineStageFlags sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+    VkPipelineStageFlags destinationStage = VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT;
+    if (oldLayout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) {
+        imageTransfer.srcAccessMask = 0; // this basically means none or doesnt matter
+        imageTransfer.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+        sourceStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+        destinationStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+    }
+    else if (oldLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) {
+        imageTransfer.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+        imageTransfer.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+        sourceStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+        destinationStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+    }
+
+    vkCmdPipelineBarrier(
+        commandBuffer,
+        sourceStage,
+        destinationStage,
+        0,
+        0, nullptr,
+        0, nullptr,
+        1, &imageTransfer
+    );
+
+    //end command buffer
+
+    endCommandBuffer(commandBuffer);
+}
+
+void EngineGraphics::createCommandBuffers(VkBuffer buffer, VkBuffer indBuffer, std::vector<model::Model*> allModels, LightObject light,
     std::vector<PushFragConstant> pfcs) {
     vertexBuffer = buffer;
     indexBuffer = indBuffer;
     recentModelData = allModels;
     recentLightObject = light;
     recentPushConstants = pfcs;
-
-    printf("the size of all models is : %u \n", allModels.size());
 
     //allocate memory for command buffer, you have to create a draw command for each image
     commandBuffers.resize(swapChainFramebuffers.size());
@@ -885,13 +1130,22 @@ void EngineGraphics::createCommandBuffers(VkBuffer buffer, VkBuffer indBuffer, s
     //push all my command buffers into an exectute stage.
     //TODO: multithread this process
 
+    std::vector<std::vector<VkDescriptorSet>> textureDescriptions(commandBuffers.size());
+    std::vector<VkDescriptorSet>::iterator it;
     for (size_t i = 0; i < commandBuffers.size(); i++) {
-        createCommandBuffer(commandBuffers[i], swapChainFramebuffers[i], descriptorSets[i], buffer, indBuffer, allModels , light, pfcs);
+        for (size_t j = 0; j < allModels.size(); j++) {
+            it = textureDescriptions[i].end();
+            textureDescriptions[i].insert(it, allModels[j]->textureSets[i].begin(), allModels[j]->textureSets[i].end());
+        }
+    }
+
+    for (size_t i = 0; i < commandBuffers.size(); i++) {
+        createCommandBuffer(commandBuffers[i], swapChainFramebuffers[i], descriptorSets[i], textureDescriptions[i], buffer, indBuffer, allModels , light, pfcs);
     }
 }
 
-void EngineGraphics::createCommandBuffer(VkCommandBuffer commandBuffer, VkFramebuffer framebuffer, std::vector<VkDescriptorSet> descriptorSet, VkBuffer vertexBuffer, VkBuffer indexBuffer, 
-    std::vector<model::Model> allModels, LightObject light, std::vector<PushFragConstant> pfcs) {
+void EngineGraphics::createCommandBuffer(VkCommandBuffer commandBuffer, VkFramebuffer framebuffer, std::vector<VkDescriptorSet> descriptorSet, std::vector<VkDescriptorSet> textureSets, VkBuffer vertexBuffer, VkBuffer indexBuffer, 
+    std::vector<model::Model*> allModels, LightObject light, std::vector<PushFragConstant> pfcs) {
 
     VkCommandBufferBeginInfo beginInfo{};
     beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -944,7 +1198,7 @@ void EngineGraphics::createCommandBuffer(VkCommandBuffer commandBuffer, VkFrameb
     vkCmdSetScissor(commandBuffer, 0, 1, &newScissor);
 
     //time for the draw calls
-    const VkDeviceSize offsets[] = { 0, offsetof(data::Vertex, normal)};
+    const VkDeviceSize offsets[] = { 0, offsetof(data::Vertex, normal), offsetof(data::Vertex, texCoord)};
     vkCmdBindVertexBuffers(commandBuffer, 0, 1, &vertexBuffer, offsets);
     vkCmdBindIndexBuffer(commandBuffer, indexBuffer, 0, VK_INDEX_TYPE_UINT32);
 
@@ -955,12 +1209,15 @@ void EngineGraphics::createCommandBuffer(VkCommandBuffer commandBuffer, VkFrameb
     //universal to every object so i can push the light constants before the for loop
     vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, 0, sizeof(light), &light);
     for (size_t i = 0; i < allModels.size(); i++) {
-        for (auto currentMesh : allModels[i].modelMeshes) {
-            uint32_t indexCount = static_cast<uint32_t>(currentMesh.getIndexData().size());
-            uint32_t vertexCount = static_cast<uint32_t>(currentMesh.getVertexData().size());
+        for (size_t j = 0; j < allModels[i]->modelMeshes.size(); j++) {
+            mesh::Mesh meshData = allModels[i]->modelMeshes[j];
+            uint32_t indexCount = static_cast<uint32_t>(meshData.getIndexData().size());
+            uint32_t vertexCount = static_cast<uint32_t>(meshData.getVertexData().size());
 
+            //update descriptor data
             vkCmdPushConstants(commandBuffer, pipelineLayout, VK_SHADER_STAGE_FRAGMENT_BIT, sizeof(light), sizeof(pfcs[i]), &pfcs[i]);
-            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 1, &descriptorSet[i], 0, nullptr);
+            VkDescriptorSet descriptors[2] = {descriptorSet[i], textureSets[i]};
+            vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, pipelineLayout, 0, 2, descriptors, 0, nullptr);
             vkCmdDrawIndexed(commandBuffer, indexCount, 1, totalIndexes, totalVertices, (uint32_t)0);
 
             totalIndexes += indexCount;
@@ -1003,7 +1260,6 @@ void EngineGraphics::createFences() {
         if (vkCreateFence(engineInit->device, &createInfo, nullptr, &inFlightFences[i]) != VK_SUCCESS) {
             throw std::runtime_error("failed to create fences");
         };
-
     }
 }
 
